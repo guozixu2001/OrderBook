@@ -21,10 +21,10 @@ public:
     }
   }
 
-  void signal(const char *name, uint64_t time, double value) {
+  void signal(const char *name, const char* symbol, uint64_t time, double value) {
     constexpr int BUFFER_SIZE = 1024;
     char buffer[BUFFER_SIZE];
-    auto ret = snprintf(buffer, BUFFER_SIZE, "%s,%lu,%f", name, time, value);
+    auto ret = snprintf(buffer, BUFFER_SIZE, "%s,%s,%lu,%f", name, symbol, time, value);
     if (ret >= BUFFER_SIZE) {
       fprintf(stderr, "snprintf exceed buffer");
       abort();
