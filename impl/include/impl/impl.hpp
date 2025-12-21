@@ -14,6 +14,7 @@ template <class Reader, class Gateway> class Impl {
 private:
   Reader &reader;
   Gateway &gateway;
+  std::vector<int64_t> grids;
 
   // Maximum number of different symbols/order books we can track
   static constexpr size_t MAX_ORDER_BOOKS = 100;
@@ -274,7 +275,8 @@ private:
   }
 
 public:
-  Impl(Reader &reader, Gateway &gateway) : reader{reader}, gateway{gateway} {
+  Impl(Reader &reader, Gateway &gateway, const std::vector<int64_t>& grids) 
+    : reader{reader}, gateway{gateway}, grids(grids) {
     LOG_DEBUG("Impl constructor");
     // Initialize order book pointers to null
     order_books_.fill(nullptr);
