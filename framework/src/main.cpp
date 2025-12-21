@@ -1,5 +1,7 @@
+#include <cstdio>
 #include "gateway.hpp"
 #include "reader.hpp"
+#include "framework/logger.hpp"
 
 #include "impl/impl.hpp"
 
