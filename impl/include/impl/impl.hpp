@@ -15,14 +15,13 @@ private:
   Reader &reader;
   Gateway &gateway;
   std::vector<int64_t> grids;
+  size_t grid_idx_ = 0;  // Current grid index
+  uint64_t last_msg_time_ = 0;  // Last processed message timestamp
 
   // Maximum number of different symbols/order books we can track
   static constexpr size_t MAX_ORDER_BOOKS = 100;
 
   // Hash map from symbol -> OrderBook using fixed-size array
-  // Following the HFT style from the reference implementation:
-  // typedef std::array<MarketOrderBook *, ME_MAX_TICKERS> MarketOrderBookHashMap;
-  // We pre-allocate ALL order books upfront to avoid allocation during message processing
   std::array<OrderBook*, MAX_ORDER_BOOKS> order_books_;
 
   // Memory pool for order books (allocated on heap during initialization)
@@ -143,7 +142,6 @@ private:
         if (ob) {
           impl::Side side = (add_msg->side == 0) ? impl::Side::BUY : impl::Side::SELL;
           ob->addOrder(add_msg->order_id, add_msg->price, add_msg->qty, side);
-          signalMetrics(ob, add_msg->symbol, add_msg->time);
         }
         break;
       }
@@ -158,7 +156,6 @@ private:
         if (ob) {
           impl::Side side = (mod_msg->side == 0) ? impl::Side::BUY : impl::Side::SELL;
           ob->modifyOrder(mod_msg->order_id, mod_msg->price, mod_msg->qty, side);
-          signalMetrics(ob, mod_msg->symbol, mod_msg->time);
         }
         break;
       }
@@ -173,7 +170,6 @@ private:
         if (ob) {
           impl::Side side = (del_msg->side == 0) ? impl::Side::BUY : impl::Side::SELL;
           ob->deleteOrder(del_msg->order_id, side);
-          signalMetrics(ob, del_msg->symbol, del_msg->time);
         }
         break;
       }
@@ -190,7 +186,6 @@ private:
           impl::Side side = (trade_msg->side == 0) ? impl::Side::BUY : impl::Side::SELL;
           ob->processTrade(trade_msg->order_id, trade_msg->trade_id, trade_msg->price,
                            trade_msg->qty, side);
-          signalMetrics(ob, trade_msg->symbol, trade_msg->time);
         }
         break;
       }
@@ -218,7 +213,7 @@ private:
       LOG_DEBUG("%s.mid_price = %f at time %lu", symbol, mid_price, time);
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.mid_price", symbol);
-      gateway.signal(metric_name, time, mid_price);
+      gateway.signal(metric_name, symbol, time, mid_price);
     }
 
     // Signal spread
@@ -227,7 +222,7 @@ private:
       LOG_DEBUG("%s.spread = %d at time %lu", symbol, spread, time);
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.spread", symbol);
-      gateway.signal(metric_name, time, static_cast<double>(spread));
+      gateway.signal(metric_name, symbol, time, static_cast<double>(spread));
     }
 
     // Signal macro price
@@ -236,7 +231,7 @@ private:
       LOG_DEBUG("%s.macro_price = %f at time %lu", symbol, macro_price, time);
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.macro_price", symbol);
-      gateway.signal(metric_name, time, macro_price);
+      gateway.signal(metric_name, symbol, time, macro_price);
     }
 
     // Signal imbalance for K=5 and K=10
@@ -245,7 +240,7 @@ private:
       LOG_DEBUG("%s.imbalance_5 = %f at time %lu", symbol, imbalance_5, time);
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.imbalance_5", symbol);
-      gateway.signal(metric_name, time, imbalance_5);
+      gateway.signal(metric_name, symbol, time, imbalance_5);
     }
 
     double imbalance_10 = ob->getImbalance(10);
@@ -253,7 +248,7 @@ private:
       LOG_DEBUG("%s.imbalance_10 = %f at time %lu", symbol, imbalance_10, time);
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.imbalance_10", symbol);
-      gateway.signal(metric_name, time, imbalance_10);
+      gateway.signal(metric_name, symbol, time, imbalance_10);
     }
 
     // Signal book pressure for K=5 and K=10
@@ -262,7 +257,7 @@ private:
       LOG_DEBUG("%s.pressure_5 = %f at time %lu", symbol, pressure_5, time);
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.pressure_5", symbol);
-      gateway.signal(metric_name, time, pressure_5);
+      gateway.signal(metric_name, symbol, time, pressure_5);
     }
 
     double pressure_10 = ob->getBookPressure(10);
@@ -270,7 +265,7 @@ private:
       LOG_DEBUG("%s.pressure_10 = %f at time %lu", symbol, pressure_10, time);
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.pressure_10", symbol);
-      gateway.signal(metric_name, time, pressure_10);
+      gateway.signal(metric_name, symbol, time, pressure_10);
     }
   }
 
@@ -323,24 +318,68 @@ public:
 
   void run() {
     LOG_DEBUG("Impl::run() started");
+
     // Process all messages from reader using try_get_tick()
+    // Only signal at timestamps specified in grids
+    // Signal when timestamp changes (last message of the timestamp)
     while (true) {
       auto [status, data, size] = reader.try_get_tick();
 
       if (status == framework::ReaderStatus::FINISHED) {
         LOG_DEBUG("ReaderStatus::FINISHED");
-        break;  // No more messages
+
+        // Process any pending grid signal for the last timestamp
+        if (grid_idx_ < grids.size() && last_msg_time_ == grids[grid_idx_]) {
+          LOG_DEBUG("Signalling at final grid time %lu", grids[grid_idx_]);
+          signalAllOrderBooks(grids[grid_idx_]);
+        }
+        break;
       }
 
       if (status == framework::ReaderStatus::OK && data && size > 0) {
-        LOG_DEBUG("ReaderStatus::OK, data=%p, size=%zu", (const void*)data, size);
-        processMessage(reinterpret_cast<const framework::message_header*>(data));
+        auto* msg = reinterpret_cast<const framework::message_header*>(data);
+        uint64_t msg_time = msg->time;
+
+        LOG_DEBUG("ReaderStatus::OK, data=%p, size=%zu, time=%lu", (const void*)data, size, msg_time);
+
+        // Check if timestamp changed (end of previous timestamp group)
+        if (last_msg_time_ != 0 && msg_time != last_msg_time_) {
+          LOG_DEBUG("Timestamp changed: %lu -> %lu", last_msg_time_, msg_time);
+
+          // Process grid that match the previous timestamp
+          if (grid_idx_ < grids.size() && last_msg_time_ == grids[grid_idx_]) {
+            LOG_DEBUG("Signalling at grid time %lu (last message of group)", grids[grid_idx_]);
+            signalAllOrderBooks(grids[grid_idx_]);
+            grid_idx_++;
+          }
+        }
+
+        // Process the message (update order book)
+        processMessage(msg);
+        last_msg_time_ = msg_time;
+
       } else {
         LOG_DEBUG("ReaderStatus::OK but data is null or size=0");
       }
-      // For PENDING status, could retry, but reader doesn't return PENDING
     }
+
     LOG_DEBUG("Impl::run() completed");
+  }
+
+  // Signal metrics for all active order books at a given timestamp
+  void signalAllOrderBooks(int64_t grid_time) {
+    size_t signalled_count = 0;
+    for (size_t i = 0; i < MAX_ORDER_BOOKS; i++) {
+      if (symbol_mapping_[i].used) {
+        const char* symbol = symbol_mapping_[i].symbol;
+        OrderBook* ob = order_books_[i];
+
+        LOG_DEBUG("Signalling symbol %s at grid time %lu", symbol, grid_time);
+        signalMetrics(ob, symbol, grid_time);
+        signalled_count++;
+      }
+    }
+    LOG_DEBUG("Completed signalling for %zu symbols at grid time %lu", signalled_count, grid_time);
   }
 };
 } // namespace impl
