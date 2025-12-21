@@ -30,7 +30,6 @@ OrderBook::~OrderBook() {
 
 // Convert price to hash index
 size_t OrderBook::priceToIndex(int32_t price) const {
-  // Use modulo to map price to array index
   // For negative prices (rare), take absolute value
   uint32_t abs_price = static_cast<uint32_t>(std::abs(price));
   return abs_price % MAX_PRICE_LEVELS;

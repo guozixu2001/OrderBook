@@ -37,8 +37,6 @@ private:
   std::array<SymbolMapping, MAX_ORDER_BOOKS> symbol_mapping_;
   size_t num_used_order_books_ = 0;
 
-  // Simple hash function for symbol strings
-  // Returns hash value (not modulo)
   size_t hashSymbol(const char* symbol) const {
     size_t hash = 0;
     for (size_t i = 0; symbol[i] != '\0' && i < 16; i++) {
@@ -47,7 +45,6 @@ private:
     return hash;
   }
 
-  // Get order book for a symbol (all order books are pre-allocated)
   OrderBook* getOrderBook(const char* symbol) {
     size_t hash = hashSymbol(symbol);
     size_t index = hash % MAX_ORDER_BOOKS;
@@ -114,7 +111,6 @@ private:
     return nullptr;  // No available order books
   }
 
-  // Process a message from the reader
   void processMessage(const framework::message_header* msg) {
     LOG_DEBUG("processMessage called with msg=%p, type=%d, size=%u",
             (const void*)msg, static_cast<int>(msg->type), msg->size);
@@ -203,7 +199,6 @@ private:
   void signalMetrics(OrderBook* ob, const char* symbol, uint64_t time) {
     const BBO* bbo = ob->getBBO();
 
-    // Debug: Print BBO values
     LOG_DEBUG("BBO: symbol=%s, bid_price=%d, bid_qty=%u, ask_price=%d, ask_qty=%u",
             symbol, bbo->bid_price, bbo->bid_qty, bbo->ask_price, bbo->ask_qty);
 
@@ -273,13 +268,9 @@ public:
   Impl(Reader &reader, Gateway &gateway, const std::vector<int64_t>& grids) 
     : reader{reader}, gateway{gateway}, grids(grids) {
     LOG_DEBUG("Impl constructor");
-    // Initialize order book pointers to null
     order_books_.fill(nullptr);
-    // symbol_mapping_ elements are value-initialized (all zeros/false)
-    LOG_DEBUG("order_books_ and symbol_mapping_ initialized");
 
     // Allocate memory pool for order books on heap during initialization
-    // Using posix_memalign for aligned memory allocation
     if (posix_memalign(reinterpret_cast<void**>(&order_book_storage_),
                        alignof(OrderBook),
                        MAX_ORDER_BOOKS * sizeof(OrderBook)) != 0) {
@@ -288,11 +279,10 @@ public:
     }
     LOG_DEBUG("order_book_storage allocated on heap");
 
-    // Pre-allocate ALL OrderBook objects upfront (following HFT reference implementation)
-    // This avoids any allocation during message processing (hot path)
+    // Pre-allocate ALL OrderBook objects upfront 
     for (size_t i = 0; i < MAX_ORDER_BOOKS; i++) {
       OrderBook* ob = reinterpret_cast<OrderBook*>(order_book_storage_ + i * sizeof(OrderBook));
-      new (ob) OrderBook();  // Use default constructor
+      new (ob) OrderBook();  
       order_books_[i] = ob;
     }
     LOG_DEBUG("All %zu OrderBook objects pre-allocated", MAX_ORDER_BOOKS);
@@ -319,9 +309,6 @@ public:
   void run() {
     LOG_DEBUG("Impl::run() started");
 
-    // Process all messages from reader using try_get_tick()
-    // Only signal at timestamps specified in grids
-    // Signal when timestamp changes (last message of the timestamp)
     while (true) {
       auto [status, data, size] = reader.try_get_tick();
 
@@ -354,7 +341,7 @@ public:
           }
         }
 
-        // Process the message (update order book)
+        // Process the message 
         processMessage(msg);
         last_msg_time_ = msg_time;
 
@@ -366,7 +353,6 @@ public:
     LOG_DEBUG("Impl::run() completed");
   }
 
-  // Signal metrics for all active order books at a given timestamp
   void signalAllOrderBooks(int64_t grid_time) {
     size_t signalled_count = 0;
     for (size_t i = 0; i < MAX_ORDER_BOOKS; i++) {
