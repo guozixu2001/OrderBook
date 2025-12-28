@@ -155,8 +155,8 @@ private:
   // Incremental statistics
   uint64_t sum_qty_ = 0;      // Sum of quantities
   uint64_t sum_amount_ = 0;   // Sum of amounts (price * qty)
-  int32_t min_price_ = INT32_MAX;
-  int32_t max_price_ = INT32_MIN;
+  mutable int32_t min_price_ = INT32_MAX;  // Updated from heaps when needed
+  mutable int32_t max_price_ = INT32_MIN;  // Updated from heaps when needed
 
   // Secondary index: timestamp -> trade index for fast eviction
   // Each bucket represents 1 second, stores the first trade in that second
@@ -166,6 +166,28 @@ private:
 
   // Pre-allocated cache for median calculation
   mutable std::array<int32_t, MAX_TRADES> price_cache_;
+
+  // Min/max maintenance using heaps with lazy deletion
+  // Each heap stores trade indices, ordered by price
+  alignas(64) std::array<size_t, MAX_TRADES> max_heap_;  // Max-heap (largest price at root)
+  alignas(64) std::array<size_t, MAX_TRADES> min_heap_;  // Min-heap (smallest price at root)
+  size_t max_heap_size_ = 0;
+  size_t min_heap_size_ = 0;
+
+  // Position of each trade in the heaps (SIZE_MAX if not in heap)
+  alignas(64) std::array<size_t, MAX_TRADES> max_heap_pos_;
+  alignas(64) std::array<size_t, MAX_TRADES> min_heap_pos_;
+
+  // Validity flags for lazy deletion
+  alignas(64) std::array<bool, MAX_TRADES> valid_;
+
+  // Heap helper functions
+  void pushToMaxHeap(size_t trade_idx);
+  void pushToMinHeap(size_t trade_idx);
+  void removeFromMaxHeap(size_t trade_idx);
+  void removeFromMinHeap(size_t trade_idx);
+  void rebuildHeapsIfNeeded();
+  void updateMinMaxFromHeaps() const;
 
 public:
   SlidingWindowStats();
@@ -179,6 +201,7 @@ public:
   // Query functions
   int32_t getPriceRange() const {
     if (count_ == 0) return 0;
+    updateMinMaxFromHeaps();
     return max_price_ - min_price_;
   }
 

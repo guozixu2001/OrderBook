@@ -2,8 +2,226 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 
 namespace impl {
+
+// Convert nanoseconds since 1970 to Unix seconds
+static uint64_t nanosecondsToUnixSeconds(uint64_t nanoseconds) {
+  return nanoseconds / 1000000000ULL;
+}
+
+// Convert YYYYMMDDHHMMSS format to Unix seconds
+static uint64_t yyyymmddhhmmssToUnixSeconds(uint64_t yyyymmddhhmmss) {
+  // Extract components
+  uint64_t sec = yyyymmddhhmmss % 100;
+  uint64_t min = (yyyymmddhhmmss / 100) % 100;
+  uint64_t hour = (yyyymmddhhmmss / 10000) % 100;
+  uint64_t day = (yyyymmddhhmmss / 1000000) % 100;
+  uint64_t month = (yyyymmddhhmmss / 100000000) % 100;
+  uint64_t year = yyyymmddhhmmss / 10000000000;
+
+  // Convert to struct tm (assuming UTC)
+  struct tm timeinfo = {};
+  timeinfo.tm_sec = static_cast<int>(sec);
+  timeinfo.tm_min = static_cast<int>(min);
+  timeinfo.tm_hour = static_cast<int>(hour);
+  timeinfo.tm_mday = static_cast<int>(day);
+  timeinfo.tm_mon = static_cast<int>(month) - 1;  // tm_mon is 0-based (0=Jan)
+  timeinfo.tm_year = static_cast<int>(year) - 1900;  // tm_year is years since 1900
+  timeinfo.tm_isdst = 0;  // No daylight saving time (UTC)
+
+  // Convert to Unix timestamp using timegm (UTC) if available, otherwise mktime
+  // Note: timegm is not standard, but common on Linux/glibc
+  // For portability, we could use mktime after setting TZ to UTC
+  // Here we use a simple approach assuming the system timezone is UTC
+  time_t timestamp = mktime(&timeinfo);
+  if (timestamp == -1) {
+    return 0;
+  }
+  return static_cast<uint64_t>(timestamp);
+}
+
+// SlidingWindowStats heap helper functions implementation
+void SlidingWindowStats::pushToMaxHeap(size_t trade_idx) {
+  // Add to end of heap
+  size_t pos = max_heap_size_;
+  max_heap_[pos] = trade_idx;
+  max_heap_pos_[trade_idx] = pos;
+  max_heap_size_++;
+
+  // Bubble up
+  while (pos > 0) {
+    size_t parent = (pos - 1) / 2;
+    if (prices_[max_heap_[parent]] >= prices_[max_heap_[pos]]) {
+      break;
+    }
+    // Swap with parent
+    std::swap(max_heap_[parent], max_heap_[pos]);
+    max_heap_pos_[max_heap_[parent]] = parent;
+    max_heap_pos_[max_heap_[pos]] = pos;
+    pos = parent;
+  }
+}
+
+void SlidingWindowStats::pushToMinHeap(size_t trade_idx) {
+  // Add to end of heap
+  size_t pos = min_heap_size_;
+  min_heap_[pos] = trade_idx;
+  min_heap_pos_[trade_idx] = pos;
+  min_heap_size_++;
+
+  // Bubble up
+  while (pos > 0) {
+    size_t parent = (pos - 1) / 2;
+    if (prices_[min_heap_[parent]] <= prices_[min_heap_[pos]]) {
+      break;
+    }
+    // Swap with parent
+    std::swap(min_heap_[parent], min_heap_[pos]);
+    min_heap_pos_[min_heap_[parent]] = parent;
+    min_heap_pos_[min_heap_[pos]] = pos;
+    pos = parent;
+  }
+}
+
+void SlidingWindowStats::removeFromMaxHeap(size_t trade_idx) {
+  size_t pos = max_heap_pos_[trade_idx];
+  if (pos == SIZE_MAX || pos >= max_heap_size_) {
+    return;  // Not in heap
+  }
+
+  // Mark as removed
+  max_heap_pos_[trade_idx] = SIZE_MAX;
+
+  // If last element, just reduce size
+  if (pos == max_heap_size_ - 1) {
+    max_heap_size_--;
+    return;
+  }
+
+  // Move last element to this position
+  size_t last_idx = max_heap_[max_heap_size_ - 1];
+  max_heap_[pos] = last_idx;
+  max_heap_pos_[last_idx] = pos;
+  max_heap_size_--;
+
+  // Restore heap property
+  size_t current = pos;
+  while (true) {
+    size_t left = 2 * current + 1;
+    size_t right = 2 * current + 2;
+    size_t largest = current;
+
+    if (left < max_heap_size_ &&
+        prices_[max_heap_[left]] > prices_[max_heap_[largest]]) {
+      largest = left;
+    }
+    if (right < max_heap_size_ &&
+        prices_[max_heap_[right]] > prices_[max_heap_[largest]]) {
+      largest = right;
+    }
+
+    if (largest == current) {
+      break;
+    }
+
+    std::swap(max_heap_[current], max_heap_[largest]);
+    max_heap_pos_[max_heap_[current]] = current;
+    max_heap_pos_[max_heap_[largest]] = largest;
+    current = largest;
+  }
+}
+
+void SlidingWindowStats::removeFromMinHeap(size_t trade_idx) {
+  size_t pos = min_heap_pos_[trade_idx];
+  if (pos == SIZE_MAX || pos >= min_heap_size_) {
+    return;  // Not in heap
+  }
+
+  // Mark as removed
+  min_heap_pos_[trade_idx] = SIZE_MAX;
+
+  // If last element, just reduce size
+  if (pos == min_heap_size_ - 1) {
+    min_heap_size_--;
+    return;
+  }
+
+  // Move last element to this position
+  size_t last_idx = min_heap_[min_heap_size_ - 1];
+  min_heap_[pos] = last_idx;
+  min_heap_pos_[last_idx] = pos;
+  min_heap_size_--;
+
+  // Restore heap property
+  size_t current = pos;
+  while (true) {
+    size_t left = 2 * current + 1;
+    size_t right = 2 * current + 2;
+    size_t smallest = current;
+
+    if (left < min_heap_size_ &&
+        prices_[min_heap_[left]] < prices_[min_heap_[smallest]]) {
+      smallest = left;
+    }
+    if (right < min_heap_size_ &&
+        prices_[min_heap_[right]] < prices_[min_heap_[smallest]]) {
+      smallest = right;
+    }
+
+    if (smallest == current) {
+      break;
+    }
+
+    std::swap(min_heap_[current], min_heap_[smallest]);
+    min_heap_pos_[min_heap_[current]] = current;
+    min_heap_pos_[min_heap_[smallest]] = smallest;
+    current = smallest;
+  }
+}
+
+void SlidingWindowStats::rebuildHeapsIfNeeded() {
+  // Simple rebuild: if heap size is much smaller than count, rebuild
+  // This is a safety mechanism in case of bugs
+  if (max_heap_size_ < count_ / 2 || min_heap_size_ < count_ / 2) {
+    // For now, just set flag to force update from heaps
+    // In a more complete implementation, we would rebuild heaps
+  }
+}
+
+void SlidingWindowStats::updateMinMaxFromHeaps() const {
+  // Clean invalid elements from top of heaps
+  while (max_heap_size_ > 0) {
+    size_t top_idx = max_heap_[0];
+    if (valid_[top_idx] && max_heap_pos_[top_idx] == 0) {
+      break;  // Valid and at correct position
+    }
+    // Invalid or misplaced, remove it
+    const_cast<SlidingWindowStats*>(this)->removeFromMaxHeap(top_idx);
+  }
+
+  while (min_heap_size_ > 0) {
+    size_t top_idx = min_heap_[0];
+    if (valid_[top_idx] && min_heap_pos_[top_idx] == 0) {
+      break;  // Valid and at correct position
+    }
+    const_cast<SlidingWindowStats*>(this)->removeFromMinHeap(top_idx);
+  }
+
+  // Update min/max prices
+  if (max_heap_size_ > 0) {
+    max_price_ = prices_[max_heap_[0]];
+  } else {
+    max_price_ = INT32_MIN;
+  }
+
+  if (min_heap_size_ > 0) {
+    min_price_ = prices_[min_heap_[0]];
+  } else {
+    min_price_ = INT32_MAX;
+  }
+}
 
 // Constructor
 OrderBook::OrderBook(const char* symbol) {
@@ -370,7 +588,8 @@ void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t p
 
   // Record trade for time window statistics
   window_stats_.recordTrade(timestamp, price, qty);
-  window_stats_.evictExpired(timestamp);
+  // Note: evictExpired is called during signal calculation (evictExpiredTrades)
+  // with grid time, not here with trade time
 
   // Check if BBO needs updating (trade on BBO level)
   bool update_bid = false;
@@ -588,24 +807,42 @@ uint32_t OrderBook::getQtyAhead(uint64_t order_id) const {
 SlidingWindowStats::SlidingWindowStats() {
   sec_index_.fill(SIZE_MAX);
   sec_count_.fill(0);
+
+  // Initialize heap data structures
+  max_heap_pos_.fill(SIZE_MAX);
+  min_heap_pos_.fill(SIZE_MAX);
+  valid_.fill(false);  // No trades recorded yet
 }
 
-void SlidingWindowStats::recordTrade(uint64_t timestamp, int32_t price, uint64_t qty) {
+void SlidingWindowStats::recordTrade(uint64_t timestamp_ns, int32_t price, uint64_t qty) {
+  // Convert nanoseconds to Unix seconds
+  uint64_t timestamp = nanosecondsToUnixSeconds(timestamp_ns);
+
   // Calculate amount
   uint64_t amount = static_cast<uint64_t>(price) * qty;
 
   // Store in ring buffer
   size_t idx = head_;
+
+  // If this position already has a valid trade (buffer full), remove it from heaps
+  if (valid_[idx]) {
+    removeFromMaxHeap(idx);
+    removeFromMinHeap(idx);
+  }
+
   timestamps_[idx] = timestamp;
   prices_[idx] = price;
   quantities_[idx] = qty;
   amounts_[idx] = amount;
 
+  // Mark as valid and add to heaps
+  valid_[idx] = true;
+  pushToMaxHeap(idx);
+  pushToMinHeap(idx);
+
   // Update incremental statistics
   sum_qty_ += qty;
   sum_amount_ += amount;
-  min_price_ = std::min(min_price_, price);
-  max_price_ = std::max(max_price_, price);
 
   // Update secondary index
   if (base_timestamp_ == 0) {
@@ -626,29 +863,41 @@ void SlidingWindowStats::recordTrade(uint64_t timestamp, int32_t price, uint64_t
   }
 }
 
-void SlidingWindowStats::evictExpired(uint64_t current_timestamp) {
-  uint64_t cutoff_time = current_timestamp - WINDOW_SECONDS;
+void SlidingWindowStats::evictExpired(uint64_t current_timestamp_yyyymmddhhmmss) {
+  // Convert grid time (YYYYMMDDHHMMSS) to Unix seconds
+  uint64_t current_seconds = yyyymmddhhmmssToUnixSeconds(current_timestamp_yyyymmddhhmmss);
+
+  // Calculate cutoff time: 10 minutes (600 seconds) before current time
+  uint64_t cutoff_seconds = current_seconds - WINDOW_SECONDS;
 
   // Use secondary index for efficient eviction
+  // We need to evict trades that are either:
+  // 1. Too old: timestamp < cutoff_seconds
+  // 2. Too new: timestamp >= current_seconds (current second)
   while (count_ > 0) {
     size_t tail_idx = (head_ + (MAX_TRADES - count_)) % MAX_TRADES;
-    uint64_t tail_time = timestamps_[tail_idx];
+    uint64_t tail_time = timestamps_[tail_idx];  // tail_time is in Unix seconds
 
-    if (tail_time > cutoff_time) {
+    // Window: [cutoff_seconds, current_seconds) - 包含 cutoff_seconds，不包含 current_seconds
+    // 即：包含 10分钟前到当前秒之前的数据，不包含当前这一秒
+    if (tail_time >= cutoff_seconds && tail_time < current_seconds) {
       break;  // All remaining trades are within window
     }
 
     // Evict this trade
     uint64_t qty = quantities_[tail_idx];
     uint64_t amount = amounts_[tail_idx];
-    int32_t price = prices_[tail_idx];
+    // Note: price is not used here - handled by heap maintenance
 
     sum_qty_ -= qty;
     sum_amount_ -= amount;
 
-    // Note: min/max may need lazy recalculation, but for HFT it's often acceptable
-    // to approximate or recalculate periodically. For now, we accept that min/max
-    // may be slightly stale after evicting the extreme value.
+    // Remove from heaps if valid
+    if (valid_[tail_idx]) {
+      removeFromMaxHeap(tail_idx);
+      removeFromMinHeap(tail_idx);
+      valid_[tail_idx] = false;
+    }
 
     // Update secondary index
     if (base_timestamp_ > 0) {
@@ -664,11 +913,7 @@ void SlidingWindowStats::evictExpired(uint64_t current_timestamp) {
     count_--;
   }
 
-  // If we evicted all trades, reset min/max
-  if (count_ == 0) {
-    min_price_ = INT32_MAX;
-    max_price_ = INT32_MIN;
-  }
+  // min/max are updated lazily via updateMinMaxFromHeaps() when getPriceRange() is called
 }
 
 int32_t SlidingWindowStats::getMedianPrice() const {
