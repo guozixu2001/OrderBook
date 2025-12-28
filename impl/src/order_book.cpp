@@ -727,7 +727,7 @@ double OrderBook::getImbalance(size_t k) const {
 
   if (total_bid_qty + total_ask_qty == 0) return 0.0;
 
-  return static_cast<double>(total_bid_qty - total_ask_qty) /
+  return (static_cast<double>(total_bid_qty) - static_cast<double>(total_ask_qty)) /
          static_cast<double>(total_bid_qty + total_ask_qty);
 }
 
@@ -950,24 +950,37 @@ int32_t SlidingWindowStats::getVWAPLevel(const OrderBook* ob) const {
   uint64_t vwap = getVWAP();
   if (vwap == 0 || !ob) return 0;
 
-  // Find which price level the VWAP falls into
   int32_t vwap_price = static_cast<int32_t>(vwap);
 
-  // Check bid levels (从最优到最差遍历)
-  size_t bid_levels = ob->getBidLevels();
-  for (size_t i = 0; i < bid_levels; i++) {
-    int32_t price = ob->getBidPrice(i);
-    if (vwap_price >= price) {
-      return static_cast<int32_t>(i);
+  // 1. 检查 Ask 侧 (如果 VWAP 落在 Ask 区域：大于等于最佳卖价)
+  if (ob->getAskLevels() > 0) {
+    int32_t best_ask = ob->getAskPrice(0);
+    if (vwap_price >= best_ask) {
+      size_t ask_levels = ob->getAskLevels();
+      for (size_t i = 0; i < ask_levels; i++) {
+        int32_t price = ob->getAskPrice(i);
+        // Ask 逻辑：找到包含该 VWAP 的档位 (vwap <= ask_price)
+        if (vwap_price <= price) {
+          return static_cast<int32_t>(-static_cast<int32_t>(i));
+        }
+      }
+      // 如果比最差的 Ask 还高，这里返回 0 或你需要定义的 "Out of Book"
+      return 0; 
     }
   }
 
-  // Check ask levels
-  size_t ask_levels = ob->getAskLevels();
-  for (size_t i = 0; i < ask_levels; i++) {
-    int32_t price = ob->getAskPrice(i);
-    if (vwap_price <= price) {
-      return static_cast<int32_t>(-static_cast<int32_t>(i));
+  // 2. 检查 Bid 侧 (如果 VWAP 落在 Bid 区域：小于等于最佳买价)
+  if (ob->getBidLevels() > 0) {
+    int32_t best_bid = ob->getBidPrice(0);
+    if (vwap_price <= best_bid) {
+      size_t bid_levels = ob->getBidLevels();
+      for (size_t i = 0; i < bid_levels; i++) {
+        int32_t price = ob->getBidPrice(i);
+        // Bid 逻辑：找到包含该 VWAP 的档位 (vwap >= bid_price)
+        if (vwap_price >= price) {
+          return static_cast<int32_t>(i);
+        }
+      }
     }
   }
 
