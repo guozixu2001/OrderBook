@@ -131,71 +131,6 @@ public:
   MemoryPool& operator=(const MemoryPool&) = delete;
 };
 
-// Forward declaration for OrderBook
-class OrderBook;
-
-// Sliding window statistics for time-based metrics
-// Pre-allocated ring buffer for zero-allocation operation
-class alignas(64) SlidingWindowStats {
-private:
-  static constexpr size_t MAX_TRADES = 65536;      // Max trades in 10 minute window
-  static constexpr size_t WINDOW_SECONDS = 600;    // 10 minutes
-  static constexpr size_t SECONDARY_BUCKETS = 601; // 600 + 1 for boundary
-
-  // Trade data (SoA layout for cache efficiency)
-  alignas(64) std::array<uint64_t, MAX_TRADES> timestamps_;  // Trade timestamps
-  alignas(64) std::array<int32_t, MAX_TRADES> prices_;       // Trade prices
-  alignas(64) std::array<uint64_t, MAX_TRADES> quantities_;  // Trade quantities
-  alignas(64) std::array<uint64_t, MAX_TRADES> amounts_;     // price * quantity
-
-  // Ring buffer pointers
-  size_t head_ = 0;    // Next write position
-  size_t count_ = 0;   // Current number of trades in window
-
-  // Incremental statistics
-  uint64_t sum_qty_ = 0;      // Sum of quantities
-  uint64_t sum_amount_ = 0;   // Sum of amounts (price * qty)
-  int32_t min_price_ = INT32_MAX;
-  int32_t max_price_ = INT32_MIN;
-
-  // Secondary index: timestamp -> trade index for fast eviction
-  // Each bucket represents 1 second, stores the first trade in that second
-  alignas(64) std::array<size_t, SECONDARY_BUCKETS> sec_index_;
-  alignas(64) std::array<size_t, SECONDARY_BUCKETS> sec_count_;
-  uint64_t base_timestamp_ = 0;
-
-  // Pre-allocated cache for median calculation
-  mutable std::array<int32_t, MAX_TRADES> price_cache_;
-
-public:
-  SlidingWindowStats();
-
-  // Record a trade (O(1) amortized)
-  void recordTrade(uint64_t timestamp, int32_t price, uint64_t qty);
-
-  // Remove expired trades older than 10 minutes from current timestamp
-  void evictExpired(uint64_t current_timestamp);
-
-  // Query functions
-  int32_t getPriceRange() const {
-    if (count_ == 0) return 0;
-    return max_price_ - min_price_;
-  }
-
-  uint64_t getTotalVolume() const { return sum_qty_; }
-  uint64_t getTotalAmount() const { return sum_amount_; }
-
-  uint64_t getVWAP() const {
-    if (count_ == 0 || sum_qty_ == 0) return 0;
-    return sum_amount_ / sum_qty_;
-  }
-
-  // Get median price (O(n) but using pre-allocated cache)
-  int32_t getMedianPrice() const;
-
-  // Get VWAP level (which price level the VWAP falls into)
-  int32_t getVWAPLevel(const OrderBook* ob) const;
-};
 
 class OrderBook {
 private:
@@ -297,6 +232,72 @@ public:
 
   OrderBook(const OrderBook&) = delete;
   OrderBook& operator=(const OrderBook&) = delete;
+};
+
+// Forward declaration for OrderBook (used in SlidingWindowStats)
+class OrderBook;
+
+// Sliding window statistics for time-based metrics
+// Pre-allocated ring buffer for zero-allocation operation
+class alignas(64) SlidingWindowStats {
+private:
+  static constexpr size_t MAX_TRADES = 65536;      // Max trades in 10 minute window
+  static constexpr size_t WINDOW_SECONDS = 600;    // 10 minutes
+  static constexpr size_t SECONDARY_BUCKETS = 601; // 600 + 1 for boundary
+
+  // Trade data (SoA layout for cache efficiency)
+  alignas(64) std::array<uint64_t, MAX_TRADES> timestamps_;  // Trade timestamps
+  alignas(64) std::array<int32_t, MAX_TRADES> prices_;       // Trade prices
+  alignas(64) std::array<uint64_t, MAX_TRADES> quantities_;  // Trade quantities
+  alignas(64) std::array<uint64_t, MAX_TRADES> amounts_;     // price * quantity
+
+  // Ring buffer pointers
+  size_t head_ = 0;    // Next write position
+  size_t count_ = 0;   // Current number of trades in window
+
+  // Incremental statistics
+  uint64_t sum_qty_ = 0;      // Sum of quantities
+  uint64_t sum_amount_ = 0;   // Sum of amounts (price * qty)
+  int32_t min_price_ = INT32_MAX;
+  int32_t max_price_ = INT32_MIN;
+
+  // Secondary index: timestamp -> trade index for fast eviction
+  // Each bucket represents 1 second, stores the first trade in that second
+  alignas(64) std::array<size_t, SECONDARY_BUCKETS> sec_index_;
+  alignas(64) std::array<size_t, SECONDARY_BUCKETS> sec_count_;
+  uint64_t base_timestamp_ = 0;
+
+  // Pre-allocated cache for median calculation
+  mutable std::array<int32_t, MAX_TRADES> price_cache_;
+
+public:
+  SlidingWindowStats();
+
+  // Record a trade (O(1) amortized)
+  void recordTrade(uint64_t timestamp, int32_t price, uint64_t qty);
+
+  // Remove expired trades older than 10 minutes from current timestamp
+  void evictExpired(uint64_t current_timestamp);
+
+  // Query functions
+  int32_t getPriceRange() const {
+    if (count_ == 0) return 0;
+    return max_price_ - min_price_;
+  }
+
+  uint64_t getTotalVolume() const { return sum_qty_; }
+  uint64_t getTotalAmount() const { return sum_amount_; }
+
+  uint64_t getVWAP() const {
+    if (count_ == 0 || sum_qty_ == 0) return 0;
+    return sum_amount_ / sum_qty_;
+  }
+
+  // Get median price (O(n) but using pre-allocated cache)
+  int32_t getMedianPrice() const;
+
+  // Get VWAP level (which price level the VWAP falls into)
+  int32_t getVWAPLevel(const OrderBook* ob) const;
 };
 
 } // namespace impl

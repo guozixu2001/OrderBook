@@ -173,15 +173,15 @@ private:
       case framework::MessageType::ADD_TRADE: {
         LOG_DEBUG("Processing ADD_TRADE");
         auto* trade_msg = static_cast<const framework::add_trade*>(msg);
-        LOG_DEBUG("symbol=%.16s, order_id=%lu, trade_id=%lu, price=%d, qty=%lu, side=%u",
+        LOG_DEBUG("symbol=%.16s, order_id=%lu, trade_id=%lu, price=%d, qty=%lu, side=%u, time=%lu",
                 trade_msg->symbol, trade_msg->order_id, trade_msg->trade_id, trade_msg->price,
-                trade_msg->qty, trade_msg->side);
+                trade_msg->qty, trade_msg->side, trade_msg->trade_time);
         OrderBook* ob = getOrderBook(trade_msg->symbol);
         LOG_DEBUG("ob=%p", (void*)ob);
         if (ob) {
           impl::Side side = (trade_msg->side == 0) ? impl::Side::BUY : impl::Side::SELL;
           ob->processTrade(trade_msg->order_id, trade_msg->trade_id, trade_msg->price,
-                           trade_msg->qty, side);
+                           trade_msg->qty, side, trade_msg->trade_time);
         }
         break;
       }
@@ -261,6 +261,63 @@ private:
       char metric_name[256];
       snprintf(metric_name, sizeof(metric_name), "%s.pressure_10", symbol);
       gateway.signal(metric_name, symbol, time, pressure_10);
+    }
+
+    // Evict expired trades based on grid time (in seconds)
+    ob->evictExpiredTrades(time);
+
+    // Signal time window metrics (10 minutes)
+    // 4.6: Price range (high - low) in past 10 minutes
+    int32_t price_range = ob->getPriceRange();
+    if (price_range >= 0) {
+      LOG_DEBUG("%s.price_range_10min = %d at time %lu", symbol, price_range, time);
+      char metric_name[256];
+      snprintf(metric_name, sizeof(metric_name), "%s.price_range_10min", symbol);
+      gateway.signal(metric_name, symbol, time, static_cast<double>(price_range));
+    }
+
+    // 4.7: Volume and amount in past 10 minutes
+    uint64_t window_volume = ob->getWindowVolume();
+    if (window_volume > 0) {
+      LOG_DEBUG("%s.volume_10min = %lu at time %lu", symbol, window_volume, time);
+      char metric_name[256];
+      snprintf(metric_name, sizeof(metric_name), "%s.volume_10min", symbol);
+      gateway.signal(metric_name, symbol, time, static_cast<double>(window_volume));
+    }
+
+    uint64_t window_amount = ob->getWindowAmount();
+    if (window_amount > 0) {
+      LOG_DEBUG("%s.amount_10min = %lu at time %lu", symbol, window_amount, time);
+      char metric_name[256];
+      snprintf(metric_name, sizeof(metric_name), "%s.amount_10min", symbol);
+      gateway.signal(metric_name, symbol, time, static_cast<double>(window_amount));
+    }
+
+    // 4.8: VWAP in past 10 minutes
+    uint64_t vwap = ob->getVWAP();
+    if (vwap > 0) {
+      LOG_DEBUG("%s.vwap_10min = %lu at time %lu", symbol, vwap, time);
+      char metric_name[256];
+      snprintf(metric_name, sizeof(metric_name), "%s.vwap_10min", symbol);
+      gateway.signal(metric_name, symbol, time, static_cast<double>(vwap));
+    }
+
+    // 4.9: Median price in past 10 minutes
+    int32_t median_price = ob->getMedianPrice();
+    if (median_price > 0) {
+      LOG_DEBUG("%s.median_price_10min = %d at time %lu", symbol, median_price, time);
+      char metric_name[256];
+      snprintf(metric_name, sizeof(metric_name), "%s.median_price_10min", symbol);
+      gateway.signal(metric_name, symbol, time, static_cast<double>(median_price));
+    }
+
+    // 4.10: VWAP level (which price level VWAP falls into)
+    int32_t vwap_level = ob->getVWAPLevel();
+    if (vwap_level != 0) {
+      LOG_DEBUG("%s.vwap_level_10min = %d at time %lu", symbol, vwap_level, time);
+      char metric_name[256];
+      snprintf(metric_name, sizeof(metric_name), "%s.vwap_level_10min", symbol);
+      gateway.signal(metric_name, symbol, time, static_cast<double>(vwap_level));
     }
   }
 
