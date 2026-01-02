@@ -5,6 +5,10 @@
 #include <cstring>
 #include <climits>
 
+// Branch prediction hints for compiler optimization
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 namespace impl {
 
 struct Order;
@@ -118,7 +122,7 @@ public:
   void deallocate(T* obj) {
     size_t index = obj - &storage_[0];
     if (index < N) {
-      obj->~T();  
+      obj->~T();
       used_[index] = false;
     }
   }
@@ -129,6 +133,183 @@ public:
 
   MemoryPool(const MemoryPool&) = delete;
   MemoryPool& operator=(const MemoryPool&) = delete;
+};
+
+// MemoryPoolV1: Free List implementation for O(1) allocate/deallocate
+// Uses intrusive free list to avoid extra memory allocation
+// NOTE: Pointer chasing causes cache misses, slower than linear scan
+template<typename T, size_t N>
+class MemoryPoolV1 {
+private:
+  // Union allows us to reuse object storage for free list pointer
+  // When node is free, we use 'next'; when allocated, we use 'storage' for T
+  union FreeNode {
+    alignas(T) char storage[sizeof(T)];  // Storage for T object
+    FreeNode* next;                       // Next free node (when not in use)
+
+    FreeNode() : next(nullptr) {}
+  };
+
+  alignas(64) std::array<FreeNode, N> storage_;
+  FreeNode* free_head_;  // Head of the free list
+
+public:
+  MemoryPoolV1() : free_head_(&storage_[0]) {
+    // Initialize free list: link all nodes together
+    // [0] -> [1] -> [2] -> ... -> [N-1] -> nullptr
+    for (size_t i = 0; i < N - 1; ++i) {
+      storage_[i].next = &storage_[i + 1];
+    }
+    storage_[N - 1].next = nullptr;
+  }
+
+  template<typename... Args>
+  T* allocate(Args&&... args) {
+    if (unlikely(free_head_ == nullptr)) {
+      return nullptr;  // Pool exhausted
+    }
+
+    // Pop from free list head (O(1))
+    FreeNode* node = free_head_;
+    free_head_ = free_head_->next;
+
+    // Construct object in the storage
+    T* obj = reinterpret_cast<T*>(node);
+    new (obj) T(std::forward<Args>(args)...);
+    return obj;
+  }
+
+  void deallocate(T* obj) {
+    // Destroy object
+    obj->~T();
+
+    // Push back to free list head (O(1))
+    FreeNode* node = reinterpret_cast<FreeNode*>(obj);
+    node->next = free_head_;
+    free_head_ = node;
+  }
+
+  bool contains(const T* obj) const {
+    const FreeNode* node = reinterpret_cast<const FreeNode*>(obj);
+    return node >= &storage_[0] && node < &storage_[0] + N;
+  }
+
+  // Debug/testing helper: get current free list size
+  size_t freeCount() const {
+    size_t count = 0;
+    const FreeNode* node = free_head_;
+    while (node) {
+      ++count;
+      node = node->next;
+    }
+    return count;
+  }
+
+  MemoryPoolV1(const MemoryPoolV1&) = delete;
+  MemoryPoolV1& operator=(const MemoryPoolV1&) = delete;
+};
+
+// MemoryPoolV2: Index-based Free List (Bitmap Stack)
+// Uses a separate array of indices instead of pointers for better cache locality
+// Key improvements:
+// 1. Indices (4 bytes) are smaller than pointers (8 bytes)
+// 2. Index array is contiguous - cache friendly
+// 3. No pointer chasing through object memory
+template<typename T, size_t N>
+class MemoryPoolV2 {
+private:
+  alignas(64) std::array<T, N> storage_;        // Object storage
+  alignas(64) std::array<uint32_t, N> free_;   // Free index stack
+  uint32_t free_count_;                        // Number of free slots
+
+public:
+  MemoryPoolV2() : free_count_(static_cast<uint32_t>(N)) {
+    // Initialize free stack with indices 0, 1, 2, ..., N-1
+    for (uint32_t i = 0; i < N; ++i) {
+      free_[i] = i;
+    }
+  }
+
+  template<typename... Args>
+  T* allocate(Args&&... args) {
+    if (unlikely(free_count_ == 0)) {
+      return nullptr;  // Pool exhausted
+    }
+
+    // Pop index from free stack
+    uint32_t idx = free_[--free_count_];
+    T* obj = &storage_[idx];
+    new (obj) T(std::forward<Args>(args)...);
+    return obj;
+  }
+
+  void deallocate(T* obj) {
+    size_t idx = obj - &storage_[0];
+    obj->~T();
+
+    // Push index back to free stack
+    free_[free_count_++] = static_cast<uint32_t>(idx);
+  }
+
+  bool contains(const T* obj) const {
+    return obj >= &storage_[0] && obj < &storage_[0] + N;
+  }
+
+  size_t freeCount() const { return free_count_; }
+
+  MemoryPoolV2(const MemoryPoolV2&) = delete;
+  MemoryPoolV2& operator=(const MemoryPoolV2&) = delete;
+};
+
+// MemoryPoolV3: Index-based Free List with prefetch
+// Same as V2 but adds prefetch hint for next allocation
+template<typename T, size_t N>
+class MemoryPoolV3 {
+private:
+  alignas(64) std::array<T, N> storage_;
+  alignas(64) std::array<uint32_t, N> free_;
+  uint32_t free_count_;
+
+public:
+  MemoryPoolV3() : free_count_(static_cast<uint32_t>(N)) {
+    for (uint32_t i = 0; i < N; ++i) {
+      free_[i] = i;
+    }
+  }
+
+  template<typename... Args>
+  T* allocate(Args&&... args) {
+    if (unlikely(free_count_ == 0)) {
+      return nullptr;
+    }
+
+    uint32_t idx = free_[--free_count_];
+    T* obj = &storage_[idx];
+
+    // Prefetch the next allocation target if available
+    if (likely(free_count_ > 0)) {
+      uint32_t next_idx = free_[free_count_ - 1];
+      __builtin_prefetch(&storage_[next_idx], 0, 1);  // Read prefetch
+    }
+
+    new (obj) T(std::forward<Args>(args)...);
+    return obj;
+  }
+
+  void deallocate(T* obj) {
+    size_t idx = obj - &storage_[0];
+    obj->~T();
+    free_[free_count_++] = static_cast<uint32_t>(idx);
+  }
+
+  bool contains(const T* obj) const {
+    return obj >= &storage_[0] && obj < &storage_[0] + N;
+  }
+
+  size_t freeCount() const { return free_count_; }
+
+  MemoryPoolV3(const MemoryPoolV3&) = delete;
+  MemoryPoolV3& operator=(const MemoryPoolV3&) = delete;
 };
 
 // Forward declaration for OrderBook
@@ -226,8 +407,9 @@ private:
 
   // Memory pools for pre-allocated objects (allocated on heap at construction)
   // Using pointers to avoid large stack allocation
-  MemoryPool<Order, MAX_ORDERS>* order_pool_ = nullptr;
-  MemoryPool<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
+  // MemoryPoolV3: Index-based Free List with prefetch (best cache performance)
+  MemoryPoolV3<Order, MAX_ORDERS>* order_pool_ = nullptr;
+  MemoryPoolV3<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
 
   // Order tracking: order_id -> Order* (O(1) lookup)
   OrderHashMap order_map_;
@@ -270,8 +452,8 @@ public:
     price_level_map_.fill(nullptr);
     bbo_ = {};
 
-    order_pool_ = new MemoryPool<Order, MAX_ORDERS>();
-    level_pool_ = new MemoryPool<PriceLevel, MAX_PRICE_LEVELS>();
+    order_pool_ = new MemoryPoolV3<Order, MAX_ORDERS>();
+    level_pool_ = new MemoryPoolV3<PriceLevel, MAX_PRICE_LEVELS>();
   }
   ~OrderBook();
 

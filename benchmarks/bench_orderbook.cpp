@@ -2,6 +2,7 @@
 #include "impl/order_book.hpp"
 #include "framework/define.hpp"
 #include <memory>
+#include <array>
 
 using namespace impl;
 
@@ -79,5 +80,398 @@ static void BM_GetVWAP(benchmark::State& state) {
     }
 }
 BENCHMARK(BM_GetVWAP);
+
+// ==========================================
+// Benchmark: MemoryPool vs MemoryPoolV1
+// ==========================================
+
+constexpr size_t POOL_SIZE = 65536;  // Same as MAX_ORDERS
+
+// Test data structure for benchmarking
+struct TestObject {
+    uint64_t id;
+    int32_t value;
+    char data[64];  // Simulate larger object size
+
+    TestObject(uint64_t i, int32_t v) : id(i), value(v) {}
+    TestObject() = default;
+};
+
+// Sequential allocation and deallocation
+static void BM_MemoryPool_Sequential(benchmark::State& state) {
+    MemoryPool<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPool();
+        new (&pool) MemoryPool<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        // Allocate all
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+        // Deallocate all
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE * 2);
+}
+
+static void BM_MemoryPoolV1_Sequential(benchmark::State& state) {
+    MemoryPoolV1<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV1();
+        new (&pool) MemoryPoolV1<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        // Allocate all
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+        // Deallocate all
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE * 2);
+}
+
+// Random allocation and deallocation (interleaved)
+static void BM_MemoryPool_Random(benchmark::State& state) {
+    MemoryPool<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t num_ops = POOL_SIZE / 2;  // Half fill, then random ops
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPool();
+        new (&pool) MemoryPool<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        // Pre-fill half the pool
+        for (size_t i = 0; i < num_ops; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        // Random allocate/deallocate pattern
+        size_t alloc_idx = num_ops;
+        size_t dealloc_idx = 0;
+        for (size_t i = 0; i < num_ops; ++i) {
+            if (alloc_idx < POOL_SIZE && (i % 3 != 0)) {
+                objs[alloc_idx] = pool.allocate(alloc_idx, static_cast<int32_t>(alloc_idx));
+                ++alloc_idx;
+            } else if (dealloc_idx < num_ops) {
+                pool.deallocate(objs[dealloc_idx]);
+                objs[dealloc_idx] = nullptr;
+                ++dealloc_idx;
+            }
+        }
+
+        // Clean up
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * num_ops * 3);
+}
+
+static void BM_MemoryPoolV1_Random(benchmark::State& state) {
+    MemoryPoolV1<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t num_ops = POOL_SIZE / 2;
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV1();
+        new (&pool) MemoryPoolV1<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        // Pre-fill half the pool
+        for (size_t i = 0; i < num_ops; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        // Random allocate/deallocate pattern
+        size_t alloc_idx = num_ops;
+        size_t dealloc_idx = 0;
+        for (size_t i = 0; i < num_ops; ++i) {
+            if (alloc_idx < POOL_SIZE && (i % 3 != 0)) {
+                objs[alloc_idx] = pool.allocate(alloc_idx, static_cast<int32_t>(alloc_idx));
+                ++alloc_idx;
+            } else if (dealloc_idx < num_ops) {
+                pool.deallocate(objs[dealloc_idx]);
+                objs[dealloc_idx] = nullptr;
+                ++dealloc_idx;
+            }
+        }
+
+        // Clean up
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * num_ops * 3);
+}
+
+// Worst case for MemoryPool: nearly full pool, fragmented
+static void BM_MemoryPool_NearlyFull(benchmark::State& state) {
+    MemoryPool<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t fill_count = POOL_SIZE - 100;  // Leave only 100 slots free
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPool();
+        new (&pool) MemoryPool<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        // Fill almost to capacity
+        for (size_t i = 0; i < fill_count; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        // Now allocate remaining (this is where linear search hurts)
+        for (size_t i = fill_count; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        // Clean up
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE);
+}
+
+static void BM_MemoryPoolV1_NearlyFull(benchmark::State& state) {
+    MemoryPoolV1<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t fill_count = POOL_SIZE - 100;
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV1();
+        new (&pool) MemoryPoolV1<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        // Fill almost to capacity
+        for (size_t i = 0; i < fill_count; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        // Now allocate remaining
+        for (size_t i = fill_count; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        // Clean up
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE);
+}
+
+// Register benchmarks with comparison grouping
+BENCHMARK(BM_MemoryPool_Sequential)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_MemoryPoolV1_Sequential)->Unit(benchmark::kMicrosecond);
+
+BENCHMARK(BM_MemoryPool_Random)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_MemoryPoolV1_Random)->Unit(benchmark::kMicrosecond);
+
+BENCHMARK(BM_MemoryPool_NearlyFull)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_MemoryPoolV1_NearlyFull)->Unit(benchmark::kMicrosecond);
+
+// ==========================================
+// Benchmark: MemoryPoolV2 & V3 (Index-based)
+// ==========================================
+
+static void BM_MemoryPoolV2_Sequential(benchmark::State& state) {
+    MemoryPoolV2<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV2();
+        new (&pool) MemoryPoolV2<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE * 2);
+}
+
+static void BM_MemoryPoolV3_Sequential(benchmark::State& state) {
+    MemoryPoolV3<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV3();
+        new (&pool) MemoryPoolV3<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE * 2);
+}
+
+static void BM_MemoryPoolV2_Random(benchmark::State& state) {
+    MemoryPoolV2<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t num_ops = POOL_SIZE / 2;
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV2();
+        new (&pool) MemoryPoolV2<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        for (size_t i = 0; i < num_ops; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        size_t alloc_idx = num_ops;
+        size_t dealloc_idx = 0;
+        for (size_t i = 0; i < num_ops; ++i) {
+            if (alloc_idx < POOL_SIZE && (i % 3 != 0)) {
+                objs[alloc_idx] = pool.allocate(alloc_idx, static_cast<int32_t>(alloc_idx));
+                ++alloc_idx;
+            } else if (dealloc_idx < num_ops) {
+                pool.deallocate(objs[dealloc_idx]);
+                objs[dealloc_idx] = nullptr;
+                ++dealloc_idx;
+            }
+        }
+
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * num_ops * 3);
+}
+
+static void BM_MemoryPoolV3_Random(benchmark::State& state) {
+    MemoryPoolV3<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t num_ops = POOL_SIZE / 2;
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV3();
+        new (&pool) MemoryPoolV3<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        for (size_t i = 0; i < num_ops; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        size_t alloc_idx = num_ops;
+        size_t dealloc_idx = 0;
+        for (size_t i = 0; i < num_ops; ++i) {
+            if (alloc_idx < POOL_SIZE && (i % 3 != 0)) {
+                objs[alloc_idx] = pool.allocate(alloc_idx, static_cast<int32_t>(alloc_idx));
+                ++alloc_idx;
+            } else if (dealloc_idx < num_ops) {
+                pool.deallocate(objs[dealloc_idx]);
+                objs[dealloc_idx] = nullptr;
+                ++dealloc_idx;
+            }
+        }
+
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * num_ops * 3);
+}
+
+static void BM_MemoryPoolV2_NearlyFull(benchmark::State& state) {
+    MemoryPoolV2<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t fill_count = POOL_SIZE - 100;
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV2();
+        new (&pool) MemoryPoolV2<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        for (size_t i = 0; i < fill_count; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+        for (size_t i = fill_count; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE);
+}
+
+static void BM_MemoryPoolV3_NearlyFull(benchmark::State& state) {
+    MemoryPoolV3<TestObject, POOL_SIZE> pool;
+    std::array<TestObject*, POOL_SIZE> objs{};
+    constexpr size_t fill_count = POOL_SIZE - 100;
+
+    for (auto _ : state) {
+        state.PauseTiming();
+        pool.~MemoryPoolV3();
+        new (&pool) MemoryPoolV3<TestObject, POOL_SIZE>();
+        objs.fill(nullptr);
+        state.ResumeTiming();
+
+        for (size_t i = 0; i < fill_count; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+        for (size_t i = fill_count; i < POOL_SIZE; ++i) {
+            objs[i] = pool.allocate(i, static_cast<int32_t>(i));
+        }
+
+        for (size_t i = 0; i < POOL_SIZE; ++i) {
+            if (objs[i]) pool.deallocate(objs[i]);
+        }
+    }
+    state.SetItemsProcessed(state.iterations() * POOL_SIZE);
+}
+
+// Register V2 and V3 benchmarks
+BENCHMARK(BM_MemoryPoolV2_Sequential)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_MemoryPoolV3_Sequential)->Unit(benchmark::kMicrosecond);
+
+BENCHMARK(BM_MemoryPoolV2_Random)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_MemoryPoolV3_Random)->Unit(benchmark::kMicrosecond);
+
+BENCHMARK(BM_MemoryPoolV2_NearlyFull)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_MemoryPoolV3_NearlyFull)->Unit(benchmark::kMicrosecond);
 
 BENCHMARK_MAIN();

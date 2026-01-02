@@ -232,8 +232,9 @@ OrderBook::OrderBook(const char* symbol) {
   bbo_ = {};
 
   // Allocate memory pools on heap (during initialization, not hot path)
-  order_pool_ = new MemoryPool<Order, MAX_ORDERS>();
-  level_pool_ = new MemoryPool<PriceLevel, MAX_PRICE_LEVELS>();
+  // MemoryPoolV3: Index-based Free List with prefetch
+  order_pool_ = new MemoryPoolV3<Order, MAX_ORDERS>();
+  level_pool_ = new MemoryPoolV3<PriceLevel, MAX_PRICE_LEVELS>();
 }
 
 // Destructor
