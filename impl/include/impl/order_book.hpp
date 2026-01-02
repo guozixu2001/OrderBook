@@ -6,6 +6,7 @@
 #include <climits>
 
 #include "impl/memory_pool.hpp"
+#include "impl/sliding_window.hpp"
 
 // Branch prediction hints for compiler optimization
 #define likely(x)   __builtin_expect(!!(x), 1)
@@ -88,95 +89,6 @@ struct alignas(64) PriceLevel {
       current = current->next;
     } while (current != first_order);
   }
-};
-
-// Forward declaration for OrderBook
-class OrderBook;
-
-// Sliding window statistics for time-based metrics
-// Pre-allocated ring buffer for zero-allocation operation
-class alignas(64) SlidingWindowStats {
-private:
-  static constexpr size_t MAX_TRADES = 65536;      // Max trades in 10 minute window
-  static constexpr size_t WINDOW_SECONDS = 600;    // 10 minutes
-  static constexpr size_t SECONDARY_BUCKETS = 601; // 600 + 1 for boundary
-
-  // Trade data (SoA layout for cache efficiency)
-  alignas(64) std::array<uint64_t, MAX_TRADES> timestamps_;  // Trade timestamps
-  alignas(64) std::array<int32_t, MAX_TRADES> prices_;       // Trade prices
-  alignas(64) std::array<uint64_t, MAX_TRADES> quantities_;  // Trade quantities
-  alignas(64) std::array<uint64_t, MAX_TRADES> amounts_;     // price * quantity
-
-  // Ring buffer pointers
-  size_t head_ = 0;    // Next write position
-  size_t count_ = 0;   // Current number of trades in window
-
-  // Incremental statistics
-  uint64_t sum_qty_ = 0;      // Sum of quantities
-  uint64_t sum_amount_ = 0;   // Sum of amounts (price * qty)
-  mutable int32_t min_price_ = INT32_MAX;  // Updated from heaps when needed
-  mutable int32_t max_price_ = INT32_MIN;  // Updated from heaps when needed
-
-  // Secondary index: timestamp -> trade index for fast eviction
-  // Each bucket represents 1 second, stores the first trade in that second
-  alignas(64) std::array<size_t, SECONDARY_BUCKETS> sec_index_;
-  alignas(64) std::array<size_t, SECONDARY_BUCKETS> sec_count_;
-  uint64_t base_timestamp_ = 0;
-
-  // Pre-allocated cache for median calculation
-  mutable std::array<int32_t, MAX_TRADES> price_cache_;
-
-  // Min/max maintenance using heaps with lazy deletion
-  // Each heap stores trade indices, ordered by price
-  alignas(64) std::array<size_t, MAX_TRADES> max_heap_;  // Max-heap (largest price at root)
-  alignas(64) std::array<size_t, MAX_TRADES> min_heap_;  // Min-heap (smallest price at root)
-  size_t max_heap_size_ = 0;
-  size_t min_heap_size_ = 0;
-
-  // Position of each trade in the heaps (SIZE_MAX if not in heap)
-  alignas(64) std::array<size_t, MAX_TRADES> max_heap_pos_;
-  alignas(64) std::array<size_t, MAX_TRADES> min_heap_pos_;
-
-  // Validity flags for lazy deletion
-  alignas(64) std::array<bool, MAX_TRADES> valid_;
-
-  // Heap helper functions
-  void pushToMaxHeap(size_t trade_idx);
-  void pushToMinHeap(size_t trade_idx);
-  void removeFromMaxHeap(size_t trade_idx);
-  void removeFromMinHeap(size_t trade_idx);
-  void rebuildHeapsIfNeeded();
-  void updateMinMaxFromHeaps() const;
-
-public:
-  SlidingWindowStats();
-
-  // Record a trade (O(1) amortized)
-  void recordTrade(uint64_t timestamp, int32_t price, uint64_t qty);
-
-  // Remove expired trades older than 10 minutes from current timestamp
-  void evictExpired(uint64_t current_timestamp);
-
-  // Query functions
-  int32_t getPriceRange() const {
-    if (count_ == 0) return 0;
-    updateMinMaxFromHeaps();
-    return max_price_ - min_price_;
-  }
-
-  uint64_t getTotalVolume() const { return sum_qty_; }
-  uint64_t getTotalAmount() const { return sum_amount_; }
-
-  uint64_t getVWAP() const {
-    if (count_ == 0 || sum_qty_ == 0) return 0;
-    return sum_amount_ / sum_qty_;
-  }
-
-  // Get median price (O(n) but using pre-allocated cache)
-  int32_t getMedianPrice() const;
-
-  // Get VWAP level (which price level the VWAP falls into)
-  int32_t getVWAPLevel(const OrderBook* ob) const;
 };
 
 class OrderBook {
