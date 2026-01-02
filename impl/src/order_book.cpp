@@ -6,12 +6,10 @@
 
 namespace impl {
 
-// Convert nanoseconds since 1970 to Unix seconds
 static uint64_t nanosecondsToUnixSeconds(uint64_t nanoseconds) {
   return nanoseconds / 1000000000ULL;
 }
 
-// Convert YYYYMMDDHHMMSS format to Unix seconds
 static uint64_t yyyymmddhhmmssToUnixSeconds(uint64_t yyyymmddhhmmss) {
   // Extract components
   uint64_t sec = yyyymmddhhmmss % 100;
@@ -21,7 +19,6 @@ static uint64_t yyyymmddhhmmssToUnixSeconds(uint64_t yyyymmddhhmmss) {
   uint64_t month = (yyyymmddhhmmss / 100000000) % 100;
   uint64_t year = yyyymmddhhmmss / 10000000000;
 
-  // Convert to struct tm (assuming UTC)
   struct tm timeinfo = {};
   timeinfo.tm_sec = static_cast<int>(sec);
   timeinfo.tm_min = static_cast<int>(min);
@@ -31,10 +28,6 @@ static uint64_t yyyymmddhhmmssToUnixSeconds(uint64_t yyyymmddhhmmss) {
   timeinfo.tm_year = static_cast<int>(year) - 1900;  // tm_year is years since 1900
   timeinfo.tm_isdst = 0;  // No daylight saving time (UTC)
 
-  // Convert to Unix timestamp using timegm (UTC) if available, otherwise mktime
-  // Note: timegm is not standard, but common on Linux/glibc
-  // For portability, we could use mktime after setting TZ to UTC
-  // Here we use a simple approach assuming the system timezone is UTC
   time_t timestamp = mktime(&timeinfo);
   if (timestamp == -1) {
     return 0;
@@ -42,7 +35,6 @@ static uint64_t yyyymmddhhmmssToUnixSeconds(uint64_t yyyymmddhhmmss) {
   return static_cast<uint64_t>(timestamp);
 }
 
-// SlidingWindowStats heap helper functions implementation
 void SlidingWindowStats::pushToMaxHeap(size_t trade_idx) {
   // Add to end of heap
   size_t pos = max_heap_size_;
@@ -232,9 +224,8 @@ OrderBook::OrderBook(const char* symbol) {
   bbo_ = {};
 
   // Allocate memory pools on heap (during initialization, not hot path)
-  // MemoryPoolV3: Index-based Free List with prefetch
-  order_pool_ = new MemoryPoolV3<Order, MAX_ORDERS>();
-  level_pool_ = new MemoryPoolV3<PriceLevel, MAX_PRICE_LEVELS>();
+  order_pool_ = new MemoryPool<Order, MAX_ORDERS>();
+  level_pool_ = new MemoryPool<PriceLevel, MAX_PRICE_LEVELS>();
 }
 
 // Destructor
