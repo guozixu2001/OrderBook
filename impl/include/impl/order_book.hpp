@@ -8,7 +8,6 @@
 #include "impl/memory_pool.hpp"
 #include "impl/sliding_window.hpp"
 
-// Branch prediction hints for compiler optimization
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
@@ -100,15 +99,15 @@ private:
   MemoryPool<Order, MAX_ORDERS>* order_pool_ = nullptr;
   MemoryPool<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
 
-  // Order tracking: order_id -> Order* (O(1) lookup)
+  // Order tracking: order_id -> Order* 
   OrderHashMap order_map_;
 
-  // Price level tracking: price -> PriceLevel* (O(1) lookup)
+  // Price level tracking: price -> PriceLevel* 
   PriceLevelHashMap price_level_map_;
 
   // Price levels: doubly linked lists sorted by price
-  PriceLevel* bids_ = nullptr;  // Best bid (highest price)
-  PriceLevel* asks_ = nullptr;  // Best ask (lowest price)
+  PriceLevel* bids_ = nullptr;  // Best bid 
+  PriceLevel* asks_ = nullptr;  // Best ask 
 
   // Best Bid/Offer cache
   BBO bbo_;
