@@ -6,7 +6,6 @@
 
 namespace impl {
 
-// Constructor
 OrderBook::OrderBook(const char* symbol) {
   std::strncpy(symbol_, symbol, SYMBOL_LEN - 1);
   symbol_[SYMBOL_LEN - 1] = '\0';
@@ -14,29 +13,22 @@ OrderBook::OrderBook(const char* symbol) {
   price_level_map_.fill(nullptr);
   bbo_ = {};
 
-  // Allocate memory pools on heap (during initialization, not hot path)
   order_pool_ = new MemoryPool<Order, MAX_ORDERS>();
   level_pool_ = new MemoryPool<PriceLevel, MAX_PRICE_LEVELS>();
 }
 
-// Destructor
 OrderBook::~OrderBook() {
-  // Clear all orders and price levels
   clear();
 
-  // Delete memory pools
   delete order_pool_;
   delete level_pool_;
 }
 
-// Convert price to hash index
 size_t OrderBook::priceToIndex(int32_t price) const {
-  // For negative prices (rare), take absolute value
   uint32_t abs_price = static_cast<uint32_t>(std::abs(price));
   return abs_price % MAX_PRICE_LEVELS;
 }
 
-// Find a price level by price (O(1) using hash map)
 PriceLevel* OrderBook::findPriceLevel(int32_t price) const {
   size_t index = priceToIndex(price);
   PriceLevel* level = price_level_map_[index];
@@ -48,12 +40,10 @@ PriceLevel* OrderBook::findPriceLevel(int32_t price) const {
   return nullptr;
 }
 
-// Add a price level to the sorted list and hash map
 void OrderBook::addPriceLevel(PriceLevel* new_level) {
   Side side = new_level->side;
   PriceLevel** head = (side == Side::BUY) ? &bids_ : &asks_;
 
-  // Add to hash map
   size_t index = priceToIndex(new_level->price);
   price_level_map_[index] = new_level;
 
@@ -68,7 +58,6 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
   PriceLevel* current = *head;
 
   if (side == Side::BUY) {
-    // Bids: sorted descending (best bid is highest price)
     if (new_level->price > current->price) {
       // New best bid
       new_level->prev = current->prev;
@@ -83,7 +72,6 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
       current = current->next;
     }
   } else {
-    // Asks: sorted ascending (best ask is lowest price)
     if (new_level->price < current->price) {
       // New best ask
       new_level->prev = current->prev;
@@ -106,7 +94,6 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
   current->next = new_level;
 }
 
-// Remove a price level from the list and hash map
 void OrderBook::removePriceLevel(PriceLevel* level) {
   Side side = level->side;
   PriceLevel** head = (side == Side::BUY) ? &bids_ : &asks_;
@@ -129,7 +116,6 @@ void OrderBook::removePriceLevel(PriceLevel* level) {
   level_pool_->deallocate(level);
 }
 
-// Update Best Bid/Offer (full update)
 void OrderBook::updateBBO() {
   if (bids_) {
     bbo_.bid_price = bids_->price;
@@ -148,7 +134,6 @@ void OrderBook::updateBBO() {
   }
 }
 
-// Update BBO only for specific side when needed
 void OrderBook::updateBBOSide(bool update_bid, bool update_ask) {
   if (update_bid) {
     if (bids_) {
@@ -171,9 +156,7 @@ void OrderBook::updateBBOSide(bool update_bid, bool update_ask) {
   }
 }
 
-// Clear entire order book
 void OrderBook::clear() {
-  // Clear all orders
   for (Order* order : order_map_) {
     if (order) {
       order_pool_->deallocate(order);
@@ -181,10 +164,8 @@ void OrderBook::clear() {
   }
   order_map_.fill(nullptr);
 
-  // Clear price level hash map
   price_level_map_.fill(nullptr);
 
-  // Clear all price levels
   while (bids_) {
     PriceLevel* next = bids_->next;
     if (next == bids_) {
@@ -213,16 +194,12 @@ void OrderBook::clear() {
     }
   }
 
-  // Reset sliding window statistics
-  // We need to reconstruct it since there's no clear() method
   window_stats_ = SlidingWindowStats();
 
   updateBBO();
 }
 
-// Add a new order
 void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
-  // Check if order_id is valid
   size_t map_index = order_id % MAX_ORDERS;
   if (order_map_[map_index] != nullptr) {
     // Order ID already exists
@@ -233,10 +210,8 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
   Order* order = order_pool_->allocate(order_id, price, qty, side);
   if (!order) return;  // Pool exhausted
 
-  // Store in order map
   order_map_[map_index] = order;
 
-  // Check if BBO needs updating
   bool update_bid = false;
   bool update_ask = false;
 
@@ -270,7 +245,6 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
   updateBBOSide(update_bid, update_ask);
 }
 
-// Modify an existing order
 void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
   size_t map_index = order_id % MAX_ORDERS;
   Order* order = order_map_[map_index];
@@ -279,7 +253,7 @@ void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side
     return;  // Order not found
   }
 
-  // Check if BBO needs updating (price change could affect BBO)
+  // Check if BBO needs updating 
   bool update_bid = false;
   bool update_ask = false;
 
@@ -359,7 +333,6 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
   updateBBOSide(update_bid, update_ask);
 }
 
-// Process a trade
 void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t price,
                              uint64_t qty, Side side, uint64_t timestamp) {
   size_t map_index = order_id % MAX_ORDERS;
@@ -371,10 +344,8 @@ void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t p
 
   // Record trade for time window statistics
   window_stats_.recordTrade(timestamp, price, qty);
-  // Note: evictExpired is called during signal calculation (evictExpiredTrades)
-  // with grid time, not here with trade time
 
-  // Check if BBO needs updating (trade on BBO level)
+  // Check if BBO needs updating 
   bool update_bid = false;
   bool update_ask = false;
 
@@ -398,7 +369,6 @@ void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t p
   updateBBOSide(update_bid, update_ask);
 }
 
-// Get number of bid levels
 size_t OrderBook::getBidLevels() const {
   size_t count = 0;
   PriceLevel* current = bids_;
@@ -410,7 +380,6 @@ size_t OrderBook::getBidLevels() const {
   return count;
 }
 
-// Get number of ask levels
 size_t OrderBook::getAskLevels() const {
   size_t count = 0;
   PriceLevel* current = asks_;
@@ -422,7 +391,6 @@ size_t OrderBook::getAskLevels() const {
   return count;
 }
 
-// Get bid price at level
 int32_t OrderBook::getBidPrice(size_t level) const {
   PriceLevel* current = bids_;
   for (size_t i = 0; i < level && current; i++) {
@@ -432,7 +400,6 @@ int32_t OrderBook::getBidPrice(size_t level) const {
   return current ? current->price : 0;
 }
 
-// Get bid quantity at level
 uint32_t OrderBook::getBidQty(size_t level) const {
   PriceLevel* current = bids_;
   for (size_t i = 0; i < level && current; i++) {
@@ -442,7 +409,6 @@ uint32_t OrderBook::getBidQty(size_t level) const {
   return current ? current->total_qty : 0;
 }
 
-// Get ask price at level
 int32_t OrderBook::getAskPrice(size_t level) const {
   PriceLevel* current = asks_;
   for (size_t i = 0; i < level && current; i++) {
@@ -452,7 +418,6 @@ int32_t OrderBook::getAskPrice(size_t level) const {
   return current ? current->price : 0;
 }
 
-// Get ask quantity at level
 uint32_t OrderBook::getAskQty(size_t level) const {
   PriceLevel* current = asks_;
   for (size_t i = 0; i < level && current; i++) {
@@ -462,7 +427,6 @@ uint32_t OrderBook::getAskQty(size_t level) const {
   return current ? current->total_qty : 0;
 }
 
-// Calculate mid price
 double OrderBook::getMidPrice() const {
   if (bbo_.bid_price > 0 && bbo_.ask_price > 0) {
     return (static_cast<double>(bbo_.bid_price) + bbo_.ask_price) / 2.0;
@@ -470,7 +434,6 @@ double OrderBook::getMidPrice() const {
   return 0.0;
 }
 
-// Calculate spread
 int32_t OrderBook::getSpread() const {
   if (bbo_.bid_price > 0 && bbo_.ask_price > 0) {
     return bbo_.ask_price - bbo_.bid_price;
@@ -478,7 +441,6 @@ int32_t OrderBook::getSpread() const {
   return 0;
 }
 
-// Calculate macro price (volume-weighted mid price)
 double OrderBook::getMacroPrice() const {
   if (bbo_.bid_qty > 0 && bbo_.ask_qty > 0 && bbo_.bid_price > 0 && bbo_.ask_price > 0) {
     double bid_weight = static_cast<double>(bbo_.bid_qty);
@@ -489,7 +451,6 @@ double OrderBook::getMacroPrice() const {
   return getMidPrice();
 }
 
-// Calculate order book imbalance for K levels
 double OrderBook::getImbalance(size_t k) const {
   uint64_t total_bid_qty = 0;
   uint64_t total_ask_qty = 0;
@@ -514,7 +475,6 @@ double OrderBook::getImbalance(size_t k) const {
          static_cast<double>(total_bid_qty + total_ask_qty);
 }
 
-// Calculate book pressure for K levels
 double OrderBook::getBookPressure(size_t k) const {
   double mid = getMidPrice();
   if (mid <= 0.0) return 0.0;
@@ -548,7 +508,6 @@ double OrderBook::getBookPressure(size_t k) const {
   return (bid_pressure - ask_pressure) / total;
 }
 
-// Get order rank (1-based)
 size_t OrderBook::getOrderRank(uint64_t order_id) const {
   size_t map_index = order_id % MAX_ORDERS;
   Order* order = order_map_[map_index];
