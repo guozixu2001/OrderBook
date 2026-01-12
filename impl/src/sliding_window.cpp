@@ -180,7 +180,6 @@ void SlidingWindowStats::removeFromMinHeap(size_t trade_idx) {
 
 void SlidingWindowStats::rebuildHeapsIfNeeded() {
   // Simple rebuild: if heap size is much smaller than count, rebuild
-  // This is a safety mechanism in case of bugs
   if (max_heap_size_ < count_ / 2 || min_heap_size_ < count_ / 2) {
     // For now, just set flag to force update from heaps
     // In a more complete implementation, we would rebuild heaps
