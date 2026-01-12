@@ -99,7 +99,7 @@ void RingBufferSlidingWindowStats::evictExpired(uint64_t current_timestamp_yyyym
     size_t tail_idx = (head_ + (MAX_TRADES - count_)) % MAX_TRADES;
     uint64_t tail_time = timestamps_[tail_idx];
 
-    // Window: [cutoff_seconds, current_seconds)
+    // Window: [cutoff_seconds, current_seconds) - 包含 cutoff，不包含 current
     if (tail_time >= cutoff_seconds && tail_time < current_seconds) {
       break;
     }
