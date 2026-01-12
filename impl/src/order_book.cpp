@@ -25,8 +25,9 @@ OrderBook::~OrderBook() {
 }
 
 size_t OrderBook::priceToIndex(int32_t price) const {
-  uint32_t abs_price = static_cast<uint32_t>(std::abs(price));
-  return abs_price % MAX_PRICE_LEVELS;
+  uint32_t abs_price = static_cast<uint32_t>(price);
+  // Since MAX_PRICE_LEVELS is power of 2, use bitwise AND instead of modulo
+  return abs_price & (MAX_PRICE_LEVELS - 1);
 }
 
 PriceLevel* OrderBook::findPriceLevel(int32_t price) const {
@@ -200,7 +201,8 @@ void OrderBook::clear() {
 }
 
 void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
-  size_t map_index = order_id % MAX_ORDERS;
+  // Since MAX_ORDERS is power of 2, use bitwise AND instead of modulo
+  size_t map_index = static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
   if (order_map_[map_index] != nullptr) {
     // Order ID already exists
     return;
@@ -246,7 +248,8 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
 }
 
 void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
-  size_t map_index = order_id % MAX_ORDERS;
+  // Since MAX_ORDERS is power of 2, use bitwise AND instead of modulo
+  size_t map_index = static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
   Order* order = order_map_[map_index];
 
   if (!order || order->order_id != order_id) {
@@ -290,7 +293,8 @@ void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side
 
 // Delete an order
 void OrderBook::deleteOrder(uint64_t order_id, Side side) {
-  size_t map_index = order_id % MAX_ORDERS;
+  // Since MAX_ORDERS is power of 2, use bitwise AND instead of modulo
+  size_t map_index = static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
   Order* order = order_map_[map_index];
 
   if (!order || order->order_id != order_id) {
@@ -335,7 +339,8 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
 
 void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t price,
                              uint64_t qty, Side side, uint64_t timestamp) {
-  size_t map_index = order_id % MAX_ORDERS;
+  // Since MAX_ORDERS is power of 2, use bitwise AND instead of modulo
+  size_t map_index = static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
   Order* order = order_map_[map_index];
 
   if (!order || order->order_id != order_id) {
@@ -509,7 +514,8 @@ double OrderBook::getBookPressure(size_t k) const {
 }
 
 size_t OrderBook::getOrderRank(uint64_t order_id) const {
-  size_t map_index = order_id % MAX_ORDERS;
+  // Since MAX_ORDERS is power of 2, use bitwise AND instead of modulo
+  size_t map_index = static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
   Order* order = order_map_[map_index];
 
   if (!order || order->order_id != order_id) {
@@ -528,7 +534,8 @@ size_t OrderBook::getOrderRank(uint64_t order_id) const {
 
 // Get quantity ahead in queue
 uint32_t OrderBook::getQtyAhead(uint64_t order_id) const {
-  size_t map_index = order_id % MAX_ORDERS;
+  // Since MAX_ORDERS is power of 2, use bitwise AND instead of modulo
+  size_t map_index = static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
   Order* order = order_map_[map_index];
 
   if (!order || order->order_id != order_id) {

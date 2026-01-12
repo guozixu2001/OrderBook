@@ -27,8 +27,10 @@ void RingBufferSlidingWindowStats::rebuildCacheIfNeeded() const {
   cached_max_price_ = std::numeric_limits<int32_t>::min();
 
   size_t num_prices = std::min(count_, MAX_TRADES);
+  // Since MAX_TRADES is power of 2, use bitwise AND instead of modulo
+  size_t mask = MAX_TRADES - 1;
   for (size_t i = 0; i < num_prices; i++) {
-    size_t idx = (head_ + (MAX_TRADES - count_ + i)) % MAX_TRADES;
+    size_t idx = (head_ + (MAX_TRADES - count_ + i)) & mask;
     int32_t price = prices_[idx];
     if (price < cached_min_price_) cached_min_price_ = price;
     if (price > cached_max_price_) cached_max_price_ = price;
@@ -59,8 +61,8 @@ void RingBufferSlidingWindowStats::recordTrade(uint64_t timestamp_ns, int32_t pr
   if (price < cached_min_price_) cached_min_price_ = price;
   if (price > cached_max_price_) cached_max_price_ = price;
 
-  // Advance head
-  head_ = (head_ + 1) % MAX_TRADES;
+  // Advance head - since MAX_TRADES is power of 2, use bitwise AND
+  head_ = (head_ + 1) & (MAX_TRADES - 1);
   if (count_ < MAX_TRADES) {
     count_++;
   }
@@ -96,7 +98,8 @@ void RingBufferSlidingWindowStats::evictExpired(uint64_t current_timestamp_yyyym
   size_t evicted = 0;
 
   while (count_ > 0) {
-    size_t tail_idx = (head_ + (MAX_TRADES - count_)) % MAX_TRADES;
+    // Since MAX_TRADES is power of 2, use bitwise AND instead of modulo
+    size_t tail_idx = (head_ + (MAX_TRADES - count_)) & (MAX_TRADES - 1);
     uint64_t tail_time = timestamps_[tail_idx];
 
     // Window: [cutoff_seconds, current_seconds) - 包含 cutoff，不包含 current
@@ -126,8 +129,10 @@ int32_t RingBufferSlidingWindowStats::getMedianPrice() const {
 
   // Copy prices to cache
   size_t num_prices = std::min(count_, MAX_TRADES);
+  // Since MAX_TRADES is power of 2, use bitwise AND instead of modulo
+  size_t mask = MAX_TRADES - 1;
   for (size_t i = 0; i < num_prices; i++) {
-    size_t idx = (head_ + (MAX_TRADES - count_ + i)) % MAX_TRADES;
+    size_t idx = (head_ + (MAX_TRADES - count_ + i)) & mask;
     price_cache_[i] = prices_[idx];
   }
 

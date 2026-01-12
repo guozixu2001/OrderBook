@@ -20,6 +20,7 @@ constexpr size_t MAX_PRICE_LEVELS = 2048;  // Maximum number of price levels
 constexpr size_t MAX_ORDERS = 65536;       // Maximum number of orders
 constexpr size_t SYMBOL_LEN = 16;          // Symbol length
 
+// Hash map type aliases (actual alignment handled by OrderBook members)
 using OrderHashMap = std::array<Order*, MAX_ORDERS>;
 using PriceLevelHashMap = std::array<PriceLevel*, MAX_PRICE_LEVELS>;
 
@@ -65,8 +66,7 @@ struct alignas(64) PriceLevel {
   PriceLevel* next = nullptr;
 
   PriceLevel(int32_t p, Side s, Order* order)
-    : price(p), side(s), first_order(order) {
-    updateQty();
+    : price(p), side(s), total_qty(order->qty), order_count(1), first_order(order) {
     prev = this;
     next = this;
   }
@@ -99,11 +99,11 @@ private:
   MemoryPool<Order, MAX_ORDERS>* order_pool_ = nullptr;
   MemoryPool<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
 
-  // Order tracking: order_id -> Order* 
-  OrderHashMap order_map_;
+  // Order tracking: order_id -> Order* (cache line aligned to prevent false sharing)
+  alignas(64) OrderHashMap order_map_;
 
-  // Price level tracking: price -> PriceLevel* 
-  PriceLevelHashMap price_level_map_;
+  // Price level tracking: price -> PriceLevel* (cache line aligned to prevent false sharing)
+  alignas(64) PriceLevelHashMap price_level_map_;
 
   // Price levels: doubly linked lists sorted by price
   PriceLevel* bids_ = nullptr;  // Best bid 
