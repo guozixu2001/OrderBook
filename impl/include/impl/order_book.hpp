@@ -6,7 +6,7 @@
 #include <climits>
 
 #include "impl/memory_pool.hpp"
-#include "impl/sliding_window.hpp"
+#include "impl/sliding_window_ring.hpp"
 
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
@@ -112,8 +112,8 @@ private:
   // Best Bid/Offer cache
   BBO bbo_;
 
-  // Sliding window statistics for trade-based metrics
-  SlidingWindowStats window_stats_;
+  // Sliding window statistics for trade-based metrics (RingBuffer optimized)
+  RingBufferSlidingWindowStats window_stats_;
 
   // Find a price level by price (O(1) using hash map)
   PriceLevel* findPriceLevel(int32_t price) const;

@@ -194,7 +194,7 @@ void OrderBook::clear() {
     }
   }
 
-  window_stats_ = SlidingWindowStats();
+  window_stats_ = RingBufferSlidingWindowStats();
 
   updateBBO();
 }

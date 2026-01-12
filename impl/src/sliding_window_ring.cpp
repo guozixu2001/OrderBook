@@ -37,7 +37,10 @@ void RingBufferSlidingWindowStats::rebuildCacheIfNeeded() const {
   cache_valid_ = true;
 }
 
-void RingBufferSlidingWindowStats::recordTrade(uint64_t timestamp, int32_t price, uint64_t qty) {
+void RingBufferSlidingWindowStats::recordTrade(uint64_t timestamp_ns, int32_t price, uint64_t qty) {
+  // Convert nanoseconds to Unix seconds
+  uint64_t timestamp = timestamp_ns / 1000000000ULL;
+
   uint64_t amount = static_cast<uint64_t>(price) * qty;
 
   size_t idx = head_;
