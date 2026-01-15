@@ -70,6 +70,8 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
     }
 
     while (current->next != *head && current->next->price > new_level->price) {
+      // Prefetch next node's next pointer to reduce memory latency
+      __builtin_prefetch(current->next->next, 0, 3);
       current = current->next;
     }
   } else {
@@ -84,6 +86,8 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
     }
 
     while (current->next != *head && current->next->price < new_level->price) {
+      // Prefetch next node's next pointer to reduce memory latency
+      __builtin_prefetch(current->next->next, 0, 3);
       current = current->next;
     }
   }

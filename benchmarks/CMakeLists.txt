@@ -77,6 +77,40 @@ target_link_libraries(bench_loop_comparison PRIVATE
     benchmark::benchmark_main
 )
 
+# Prefetch optimization benchmark
+add_executable(bench_prefetch bench_prefetch.cpp)
+set_property(TARGET bench_prefetch PROPERTY CXX_STANDARD 17)
+
+target_compile_options(bench_prefetch PRIVATE -O3 -mtune=skylake -march=skylake -Wall -Wextra)
+
+target_include_directories(bench_prefetch PRIVATE
+    ${CMAKE_SOURCE_DIR}/framework/include
+    ${CMAKE_SOURCE_DIR}/impl/include
+)
+
+target_link_libraries(bench_prefetch PRIVATE
+    impl_lib
+    benchmark::benchmark
+    benchmark::benchmark_main
+)
+
+# Prefetch comparison benchmark (with vs without)
+add_executable(bench_prefetch_compare bench_prefetch_compare.cpp)
+set_property(TARGET bench_prefetch_compare PROPERTY CXX_STANDARD 17)
+
+target_compile_options(bench_prefetch_compare PRIVATE -O3 -mtune=skylake -march=skylake -Wall -Wextra)
+
+target_include_directories(bench_prefetch_compare PRIVATE
+    ${CMAKE_SOURCE_DIR}/framework/include
+    ${CMAKE_SOURCE_DIR}/impl/include
+)
+
+target_link_libraries(bench_prefetch_compare PRIVATE
+    impl_lib
+    benchmark::benchmark
+    benchmark::benchmark_main
+)
+
 # Add benchmark to CTest (optional)
 # include(GoogleTest)
 # gtest_discover_tests(benchmarks)
