@@ -43,6 +43,40 @@ target_link_libraries(bench_compare PRIVATE
     benchmark::benchmark_main
 )
 
+# Loop boundary check optimization benchmark
+add_executable(bench_loop_optimization bench_loop_optimization.cpp)
+set_property(TARGET bench_loop_optimization PROPERTY CXX_STANDARD 17)
+
+target_compile_options(bench_loop_optimization PRIVATE -O3 -mtune=skylake -march=skylake -Wall -Wextra)
+
+target_include_directories(bench_loop_optimization PRIVATE
+    ${CMAKE_SOURCE_DIR}/framework/include
+    ${CMAKE_SOURCE_DIR}/impl/include
+)
+
+target_link_libraries(bench_loop_optimization PRIVATE
+    impl_lib
+    benchmark::benchmark
+    benchmark::benchmark_main
+)
+
+# Loop comparison benchmark (old vs new)
+add_executable(bench_loop_comparison bench_loop_comparison.cpp)
+set_property(TARGET bench_loop_comparison PROPERTY CXX_STANDARD 17)
+
+target_compile_options(bench_loop_comparison PRIVATE -O3 -mtune=skylake -march=skylake -Wall -Wextra)
+
+target_include_directories(bench_loop_comparison PRIVATE
+    ${CMAKE_SOURCE_DIR}/framework/include
+    ${CMAKE_SOURCE_DIR}/impl/include
+)
+
+target_link_libraries(bench_loop_comparison PRIVATE
+    impl_lib
+    benchmark::benchmark
+    benchmark::benchmark_main
+)
+
 # Add benchmark to CTest (optional)
 # include(GoogleTest)
 # gtest_discover_tests(benchmarks)

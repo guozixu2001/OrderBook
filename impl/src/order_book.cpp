@@ -375,24 +375,26 @@ void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t p
 }
 
 size_t OrderBook::getBidLevels() const {
+  if (!bids_) return 0;
   size_t count = 0;
-  PriceLevel* current = bids_;
-  while (current) {
+  PriceLevel* start = bids_;
+  PriceLevel* current = start;
+  do {
     count++;
-    if (current->next == bids_) break;
     current = current->next;
-  }
+  } while (current != start);
   return count;
 }
 
 size_t OrderBook::getAskLevels() const {
+  if (!asks_) return 0;
   size_t count = 0;
-  PriceLevel* current = asks_;
-  while (current) {
+  PriceLevel* start = asks_;
+  PriceLevel* current = start;
+  do {
     count++;
-    if (current->next == asks_) break;
     current = current->next;
-  }
+  } while (current != start);
   return count;
 }
 
