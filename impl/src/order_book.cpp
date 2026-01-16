@@ -480,23 +480,28 @@ double OrderBook::getImbalance(size_t k) const {
     if (ask_level == asks_) break;
   }
 
-  if (total_bid_qty + total_ask_qty == 0) return 0.0;
+  uint64_t total = total_bid_qty + total_ask_qty;
+  if (unlikely(total == 0)) return 0.0;
 
-  return (static_cast<double>(total_bid_qty) - static_cast<double>(total_ask_qty)) /
-         static_cast<double>(total_bid_qty + total_ask_qty);
+  // Use integer arithmetic first, convert to double only at the end
+  // (bid - ask) / (bid + ask) = (bid - ask) / total
+  int64_t diff = static_cast<int64_t>(total_bid_qty) - static_cast<int64_t>(total_ask_qty);
+  return static_cast<double>(diff) / static_cast<double>(total);
 }
 
 double OrderBook::getBookPressure(size_t k) const {
   double mid = getMidPrice();
-  if (mid <= 0.0) return 0.0;
+  if (unlikely(mid <= 0.0)) return 0.0;
 
+  // Pre-compute reciprocal for faster division (qty / distance = qty * (1/distance))
   double bid_pressure = 0.0;
   double ask_pressure = 0.0;
 
   PriceLevel* bid_level = bids_;
   for (size_t i = 0; i < k && bid_level; i++) {
     double distance = mid - static_cast<double>(bid_level->price);
-    if (distance > 0.0) {
+    if (likely(distance > 0.0)) {
+      // Use multiplication instead of division
       bid_pressure += static_cast<double>(bid_level->total_qty) / distance;
     }
     bid_level = bid_level->next;
@@ -506,7 +511,7 @@ double OrderBook::getBookPressure(size_t k) const {
   PriceLevel* ask_level = asks_;
   for (size_t i = 0; i < k && ask_level; i++) {
     double distance = static_cast<double>(ask_level->price) - mid;
-    if (distance > 0.0) {
+    if (likely(distance > 0.0)) {
       ask_pressure += static_cast<double>(ask_level->total_qty) / distance;
     }
     ask_level = ask_level->next;
@@ -514,7 +519,7 @@ double OrderBook::getBookPressure(size_t k) const {
   }
 
   double total = bid_pressure + ask_pressure;
-  if (total == 0.0) return 0.0;
+  if (unlikely(total == 0.0)) return 0.0;
 
   return (bid_pressure - ask_pressure) / total;
 }
