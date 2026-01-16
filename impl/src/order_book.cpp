@@ -13,8 +13,10 @@ OrderBook::OrderBook(const char* symbol) {
   price_level_map_.fill(nullptr);
   bbo_ = {};
 
-  order_pool_ = new MemoryPool<Order, MAX_ORDERS>();
-  level_pool_ = new MemoryPool<PriceLevel, MAX_PRICE_LEVELS>();
+  // 16 cold tiers allows up to ~1M orders (65536 * 17)
+  order_pool_ = new TieredMemoryPool<Order, MAX_ORDERS>(16);
+  // 8 cold tiers allows up to ~18K price levels (2048 * 9)
+  level_pool_ = new TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>(8);
 }
 
 OrderBook::~OrderBook() {

@@ -6,6 +6,7 @@
 #include <climits>
 
 #include "impl/memory_pool.hpp"
+#include "impl/tiered_memory_pool.hpp"
 #include "impl/sliding_window_ring.hpp"
 
 #define likely(x)   __builtin_expect(!!(x), 1)
@@ -94,10 +95,11 @@ class OrderBook {
 private:
   char symbol_[SYMBOL_LEN];
 
-  // Memory pools for pre-allocated objects (allocated on heap at construction)
-  // Using pointers to avoid large stack allocation
-  MemoryPool<Order, MAX_ORDERS>* order_pool_ = nullptr;
-  MemoryPool<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
+  // Tiered memory pools for scalable capacity
+  // L0 (hot tier) handles normal load, L1+ (cold tiers) handle overflow
+  // All tiers pre-allocated at construction - no heap allocation on hot path
+  TieredMemoryPool<Order, MAX_ORDERS>* order_pool_ = nullptr;
+  TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
 
   // Order tracking: order_id -> Order* (cache line aligned to prevent false sharing)
   alignas(64) OrderHashMap order_map_;
@@ -137,8 +139,10 @@ public:
     price_level_map_.fill(nullptr);
     bbo_ = {};
 
-    order_pool_ = new MemoryPool<Order, MAX_ORDERS>();
-    level_pool_ = new MemoryPool<PriceLevel, MAX_PRICE_LEVELS>();
+    // 16 cold tiers allows up to ~1M orders (65536 * 17)
+    order_pool_ = new TieredMemoryPool<Order, MAX_ORDERS>(16);
+    // 8 cold tiers allows up to ~18K price levels (2048 * 9)
+    level_pool_ = new TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>(8);
   }
   ~OrderBook();
 
