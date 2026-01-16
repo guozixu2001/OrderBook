@@ -35,7 +35,8 @@ PriceLevel* OrderBook::findPriceLevel(int32_t price) const {
   PriceLevel* level = price_level_map_[index];
 
   // Verify the level matches the price (handle hash collisions)
-  if (level && level->price == price) {
+  // Most lookups should hit - use likely hint for branch prediction
+  if (likely(level && level->price == price)) {
     return level;
   }
   return nullptr;

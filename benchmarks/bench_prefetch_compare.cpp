@@ -92,4 +92,4 @@ static void BM_AddOrderMiddle(benchmark::State& state) {
 }
 BENCHMARK(BM_AddOrderMiddle)->Ranges({{10, 200}, {10, 100}});
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library

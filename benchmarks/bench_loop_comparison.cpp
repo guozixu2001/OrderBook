@@ -157,4 +157,4 @@ static void BM_GetLevelsOptimized(benchmark::State& state) {
 }
 BENCHMARK(BM_GetLevelsOptimized)->Range(10, 500);
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library

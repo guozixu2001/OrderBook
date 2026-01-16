@@ -193,4 +193,4 @@ static void Correctness_test(benchmark::State& state) {
 }
 BENCHMARK(Correctness_test);
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library

@@ -121,4 +121,4 @@ static void BM_RingBuffer_Increment_Bitwise(benchmark::State& state) {
 }
 BENCHMARK(BM_RingBuffer_Increment_Bitwise)->Range(1000, 100000);
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library

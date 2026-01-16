@@ -282,4 +282,4 @@ static void BM_RingBuffer_init(benchmark::State& state) {
 }
 BENCHMARK(BM_RingBuffer_init);
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library

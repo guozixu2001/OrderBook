@@ -188,4 +188,4 @@ BENCHMARK(BM_MemoryPool_Sequential)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_MemoryPool_Random)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_MemoryPool_NearlyFull)->Unit(benchmark::kMicrosecond);
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library

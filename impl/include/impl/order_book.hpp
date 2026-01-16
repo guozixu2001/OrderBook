@@ -115,9 +115,6 @@ private:
   // Sliding window statistics for trade-based metrics (RingBuffer optimized)
   RingBufferSlidingWindowStats window_stats_;
 
-  // Find a price level by price (O(1) using hash map)
-  PriceLevel* findPriceLevel(int32_t price) const;
-
   // Convert price to hash index
   size_t priceToIndex(int32_t price) const;
 
@@ -159,6 +156,8 @@ public:
 
   // Query functions
   const BBO* getBBO() const { return &bbo_; }
+  // Find a price level by price (O(1) using hash map)
+  PriceLevel* findPriceLevel(int32_t price) const;
   // Get number of price levels
   size_t getBidLevels() const;
   size_t getAskLevels() const;

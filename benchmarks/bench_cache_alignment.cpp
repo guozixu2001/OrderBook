@@ -245,4 +245,4 @@ static void BM_OrderMap_MultiThreaded(benchmark::State& state) {
 }
 BENCHMARK(BM_OrderMap_MultiThreaded)->Range(2, 16)->UseRealTime();
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library

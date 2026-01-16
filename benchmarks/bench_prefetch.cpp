@@ -110,4 +110,4 @@ static void BM_GetBookPressure(benchmark::State& state) {
 }
 BENCHMARK(BM_GetBookPressure)->Ranges({{10, 500}, {5, 100}});
 
-BENCHMARK_MAIN();
+//BENCHMARK_MAIN(); // main provided by benchmark_main library
