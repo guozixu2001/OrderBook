@@ -6,6 +6,59 @@
 
 namespace impl {
 
+namespace {
+
+size_t orderHash(uint64_t order_id) {
+  return static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
+}
+
+size_t findOrderIndex(const OrderHashMap& map, uint64_t order_id) {
+  size_t mask = MAX_ORDERS - 1;
+  size_t index = orderHash(order_id);
+  size_t start_index = index;
+  while (map[index] != nullptr) {
+    if (map[index]->order_id == order_id) {
+      return index;
+    }
+    index = (index + 1) & mask;
+    if (index == start_index) {
+      break;
+    }
+  }
+  return MAX_ORDERS;
+}
+
+bool hasEmptySlot(const OrderHashMap& map, size_t start_index) {
+  size_t mask = MAX_ORDERS - 1;
+  size_t index = start_index;
+  for (size_t probe = 0; probe < MAX_ORDERS; ++probe) {
+    if (!map[index]) {
+      return true;
+    }
+    index = (index + 1) & mask;
+  }
+  return false;
+}
+
+void backwardShiftDelete(OrderHashMap& map, size_t index) {
+  size_t mask = MAX_ORDERS - 1;
+  size_t hole = index;
+  size_t next = (hole + 1) & mask;
+  while (map[next] != nullptr) {
+    size_t home = orderHash(map[next]->order_id);
+    size_t dist = (next - home) & mask;
+    if (dist == 0) {
+      break;
+    }
+    map[hole] = map[next];
+    hole = next;
+    next = (next + 1) & mask;
+  }
+  map[hole] = nullptr;
+}
+
+}  // namespace
+
 OrderBook::OrderBook(const char* symbol) {
   std::strncpy(symbol_, symbol, SYMBOL_LEN - 1);
   symbol_[SYMBOL_LEN - 1] = '\0';
@@ -208,29 +261,41 @@ void OrderBook::clear() {
 }
 
 void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
-  // Use linear probing to handle hash collisions
-  // Since MAX_ORDERS is power of 2, use bitwise AND instead of modulo
+  // Use Robin Hood hashing with backward-shift deletion compatibility.
   size_t mask = MAX_ORDERS - 1;
-  size_t start_index = static_cast<size_t>(order_id) & mask;
-  size_t index = start_index;
+  size_t start_index = orderHash(order_id);
 
-  // Search for empty slot or existing order with same ID
-  while (order_map_[index] != nullptr) {
-    if (order_map_[index]->order_id == order_id) {
-      return;  // Order ID already exists
-    }
-    index = (index + 1) & mask;
-    if (index == start_index) {
-      return;  // Hash table is full
-    }
+  if (findOrderIndex(order_map_, order_id) != MAX_ORDERS) {
+    return;  // Order ID already exists
+  }
+  if (!hasEmptySlot(order_map_, start_index)) {
+    return;  // Hash table is full
   }
 
-  // Found empty slot at 'index'
   // Create new order from pool
-  Order* order = order_pool_->allocate(order_id, price, qty, side);
-  if (!order) return;  // Pool exhausted
+  Order* new_order = order_pool_->allocate(order_id, price, qty, side);
+  if (!new_order) return;  // Pool exhausted
 
-  order_map_[index] = order;
+  // Robin Hood insertion: swap with entries that have shorter probe distance.
+  Order* to_insert = new_order;
+  size_t index = start_index;
+  size_t probe = 0;
+  while (true) {
+    if (order_map_[index] == nullptr) {
+      order_map_[index] = to_insert;
+      break;
+    }
+
+    size_t existing_home = static_cast<size_t>(order_map_[index]->order_id) & mask;
+    size_t existing_probe = (index - existing_home) & mask;
+    if (existing_probe < probe) {
+      std::swap(order_map_[index], to_insert);
+      probe = existing_probe;
+    }
+
+    index = (index + 1) & mask;
+    ++probe;
+  }
 
   bool update_bid = false;
   bool update_ask = false;
@@ -244,20 +309,23 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
   // Find or create price level
   PriceLevel* level = findPriceLevel(price);
   if (!level) {
-    level = level_pool_->allocate(price, side, order);
+    level = level_pool_->allocate(price, side, new_order);
     if (!level) {
-      order_pool_->deallocate(order);
-      order_map_[index] = nullptr;
+      order_pool_->deallocate(new_order);
+      size_t remove_idx = findOrderIndex(order_map_, order_id);
+      if (remove_idx != MAX_ORDERS) {
+        backwardShiftDelete(order_map_, remove_idx);
+      }
       return;
     }
     addPriceLevel(level);
   } else {
     // Add to existing price level
     Order* first = level->first_order;
-    order->prev = first->prev;
-    order->next = first;
-    first->prev->next = order;
-    first->prev = order;
+    new_order->prev = first->prev;
+    new_order->next = first;
+    first->prev->next = new_order;
+    first->prev = new_order;
     level->total_qty += qty;
     level->order_count++;
   }
@@ -266,23 +334,8 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
 }
 
 void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
-  // Use linear probing to find the order
-  size_t mask = MAX_ORDERS - 1;
-  size_t start_index = static_cast<size_t>(order_id) & mask;
-  size_t index = start_index;
-  Order* order = nullptr;
-
-  // Search through probe sequence
-  while (order_map_[index] != nullptr) {
-    if (order_map_[index]->order_id == order_id) {
-      order = order_map_[index];
-      break;
-    }
-    index = (index + 1) & mask;
-    if (index == start_index) {
-      break;  // Full circle, not found
-    }
-  }
+  size_t index = findOrderIndex(order_map_, order_id);
+  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
 
   if (!order) {
     return;  // Order not found
@@ -325,23 +378,8 @@ void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side
 
 // Delete an order
 void OrderBook::deleteOrder(uint64_t order_id, Side side) {
-  // Use linear probing to find the order
-  size_t mask = MAX_ORDERS - 1;
-  size_t start_index = static_cast<size_t>(order_id) & mask;
-  size_t index = start_index;
-  Order* order = nullptr;
-
-  // Search through probe sequence
-  while (order_map_[index] != nullptr) {
-    if (order_map_[index]->order_id == order_id) {
-      order = order_map_[index];
-      break;
-    }
-    index = (index + 1) & mask;
-    if (index == start_index) {
-      break;  // Full circle, not found
-    }
-  }
+  size_t index = findOrderIndex(order_map_, order_id);
+  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
 
   if (!order) {
     return;  // Order not found
@@ -377,7 +415,7 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
   }
 
   // Remove from order map and deallocate
-  order_map_[index] = nullptr;
+  backwardShiftDelete(order_map_, index);
   order_pool_->deallocate(order);
 
   updateBBOSide(update_bid, update_ask);
@@ -385,23 +423,8 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
 
 void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t price,
                              uint64_t qty, Side side, uint64_t timestamp) {
-  // Use linear probing to find the order
-  size_t mask = MAX_ORDERS - 1;
-  size_t start_index = static_cast<size_t>(order_id) & mask;
-  size_t index = start_index;
-  Order* order = nullptr;
-
-  // Search through probe sequence
-  while (order_map_[index] != nullptr) {
-    if (order_map_[index]->order_id == order_id) {
-      order = order_map_[index];
-      break;
-    }
-    index = (index + 1) & mask;
-    if (index == start_index) {
-      break;  // Full circle, not found
-    }
-  }
+  size_t index = findOrderIndex(order_map_, order_id);
+  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
 
   if (!order) {
     return;  // Order not found
@@ -581,23 +604,8 @@ double OrderBook::getBookPressure(size_t k) const {
 }
 
 size_t OrderBook::getOrderRank(uint64_t order_id) const {
-  // Use linear probing to find the order
-  size_t mask = MAX_ORDERS - 1;
-  size_t start_index = static_cast<size_t>(order_id) & mask;
-  size_t index = start_index;
-  Order* order = nullptr;
-
-  // Search through probe sequence
-  while (order_map_[index] != nullptr) {
-    if (order_map_[index]->order_id == order_id) {
-      order = order_map_[index];
-      break;
-    }
-    index = (index + 1) & mask;
-    if (index == start_index) {
-      break;  // Full circle, not found
-    }
-  }
+  size_t index = findOrderIndex(order_map_, order_id);
+  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
 
   if (!order) {
     return 0;
@@ -615,23 +623,8 @@ size_t OrderBook::getOrderRank(uint64_t order_id) const {
 
 // Get quantity ahead in queue
 uint32_t OrderBook::getQtyAhead(uint64_t order_id) const {
-  // Use linear probing to find the order
-  size_t mask = MAX_ORDERS - 1;
-  size_t start_index = static_cast<size_t>(order_id) & mask;
-  size_t index = start_index;
-  Order* order = nullptr;
-
-  // Search through probe sequence
-  while (order_map_[index] != nullptr) {
-    if (order_map_[index]->order_id == order_id) {
-      order = order_map_[index];
-      break;
-    }
-    index = (index + 1) & mask;
-    if (index == start_index) {
-      break;  // Full circle, not found
-    }
-  }
+  size_t index = findOrderIndex(order_map_, order_id);
+  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
 
   if (!order) {
     return 0;

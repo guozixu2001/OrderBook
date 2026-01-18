@@ -439,6 +439,26 @@ TEST_F(OrderBookTest, OrderRankAfterDeletion) {
     EXPECT_EQ(ob->getQtyAhead(3), 10);
 }
 
+TEST_F(OrderBookTest, DeleteWithLinearProbingCollisions) {
+    // 强制 order_id 哈希冲突，验证删除不会截断探测链
+    uint64_t id1 = 1;
+    uint64_t id2 = id1 + MAX_ORDERS;
+    uint64_t id3 = id1 + 2 * MAX_ORDERS;
+
+    ob->addOrder(id1, 100, 10, Side::BUY);
+    ob->addOrder(id2, 100, 20, Side::BUY);
+    ob->addOrder(id3, 100, 30, Side::BUY);
+
+    EXPECT_EQ(ob->getBidQty(0), 60);
+
+    ob->deleteOrder(id1, Side::BUY);
+    EXPECT_EQ(ob->getBidQty(0), 50);
+
+    // 如果探测链被截断，这里会找不到 id2，数量不会继续下降
+    ob->deleteOrder(id2, Side::BUY);
+    EXPECT_EQ(ob->getBidQty(0), 30);
+}
+
 // ==========================================
 // 6. 成交量/成交额测试 (Volume/Amount)
 // ==========================================
