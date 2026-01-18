@@ -459,6 +459,27 @@ TEST_F(OrderBookTest, DeleteWithLinearProbingCollisions) {
     EXPECT_EQ(ob->getBidQty(0), 30);
 }
 
+TEST_F(OrderBookTest, PriceLevelHashCollisions) {
+    // 价格哈希碰撞：p2 与 p1 在同一槽位
+    int32_t p1 = 100;
+    int32_t p2 = p1 + static_cast<int32_t>(MAX_PRICE_LEVELS);
+
+    ob->addOrder(1, p1, 10, Side::BUY);
+    ob->addOrder(2, p2, 20, Side::BUY);
+
+    EXPECT_EQ(ob->getBidLevels(), 2);
+    EXPECT_EQ(ob->getBidPrice(0), p2);
+    EXPECT_EQ(ob->getBidQty(0), 20);
+    EXPECT_EQ(ob->getBidPrice(1), p1);
+    EXPECT_EQ(ob->getBidQty(1), 10);
+
+    // 删除高价层，低价层仍应存在
+    ob->deleteOrder(2, Side::BUY);
+    EXPECT_EQ(ob->getBidLevels(), 1);
+    EXPECT_EQ(ob->getBidPrice(0), p1);
+    EXPECT_EQ(ob->getBidQty(0), 10);
+}
+
 // ==========================================
 // 6. 成交量/成交额测试 (Volume/Amount)
 // ==========================================

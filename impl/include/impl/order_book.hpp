@@ -120,8 +120,8 @@ private:
   // Convert price to hash index
   size_t priceToIndex(int32_t price) const;
 
-  // Add a price level to the book
-  void addPriceLevel(PriceLevel* level);
+  // Add a price level to the book; returns false if the hash table is full
+  bool addPriceLevel(PriceLevel* level);
 
   // Remove a price level from the book
   void removePriceLevel(PriceLevel* level);

@@ -12,6 +12,10 @@ size_t orderHash(uint64_t order_id) {
   return static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
 }
 
+size_t priceHash(int32_t price) {
+  return static_cast<uint32_t>(price) & (MAX_PRICE_LEVELS - 1);
+}
+
 size_t findOrderIndex(const OrderHashMap& map, uint64_t order_id) {
   size_t mask = MAX_ORDERS - 1;
   size_t index = orderHash(order_id);
@@ -28,10 +32,38 @@ size_t findOrderIndex(const OrderHashMap& map, uint64_t order_id) {
   return MAX_ORDERS;
 }
 
+size_t findPriceLevelIndex(const PriceLevelHashMap& map, int32_t price) {
+  size_t mask = MAX_PRICE_LEVELS - 1;
+  size_t index = priceHash(price);
+  size_t start_index = index;
+  while (map[index] != nullptr) {
+    if (map[index]->price == price) {
+      return index;
+    }
+    index = (index + 1) & mask;
+    if (index == start_index) {
+      break;
+    }
+  }
+  return MAX_PRICE_LEVELS;
+}
+
 bool hasEmptySlot(const OrderHashMap& map, size_t start_index) {
   size_t mask = MAX_ORDERS - 1;
   size_t index = start_index;
   for (size_t probe = 0; probe < MAX_ORDERS; ++probe) {
+    if (!map[index]) {
+      return true;
+    }
+    index = (index + 1) & mask;
+  }
+  return false;
+}
+
+bool hasEmptyPriceSlot(const PriceLevelHashMap& map, size_t start_index) {
+  size_t mask = MAX_PRICE_LEVELS - 1;
+  size_t index = start_index;
+  for (size_t probe = 0; probe < MAX_PRICE_LEVELS; ++probe) {
     if (!map[index]) {
       return true;
     }
@@ -46,6 +78,23 @@ void backwardShiftDelete(OrderHashMap& map, size_t index) {
   size_t next = (hole + 1) & mask;
   while (map[next] != nullptr) {
     size_t home = orderHash(map[next]->order_id);
+    size_t dist = (next - home) & mask;
+    if (dist == 0) {
+      break;
+    }
+    map[hole] = map[next];
+    hole = next;
+    next = (next + 1) & mask;
+  }
+  map[hole] = nullptr;
+}
+
+void backwardShiftDeletePrice(PriceLevelHashMap& map, size_t index) {
+  size_t mask = MAX_PRICE_LEVELS - 1;
+  size_t hole = index;
+  size_t next = (hole + 1) & mask;
+  while (map[next] != nullptr) {
+    size_t home = priceHash(map[next]->price);
     size_t dist = (next - home) & mask;
     if (dist == 0) {
       break;
@@ -80,28 +129,29 @@ OrderBook::~OrderBook() {
 }
 
 size_t OrderBook::priceToIndex(int32_t price) const {
-  uint32_t abs_price = static_cast<uint32_t>(price);
   // Since MAX_PRICE_LEVELS is power of 2, use bitwise AND instead of modulo
-  return abs_price & (MAX_PRICE_LEVELS - 1);
+  return priceHash(price);
 }
 
 PriceLevel* OrderBook::findPriceLevel(int32_t price) const {
-  size_t index = priceToIndex(price);
-  PriceLevel* level = price_level_map_[index];
-
-  // Verify the level matches the price (handle hash collisions)
-  // Most lookups should hit - use likely hint for branch prediction
-  if (likely(level && level->price == price)) {
-    return level;
-  }
-  return nullptr;
+  size_t index = findPriceLevelIndex(price_level_map_, price);
+  return (index != MAX_PRICE_LEVELS) ? price_level_map_[index] : nullptr;
 }
 
-void OrderBook::addPriceLevel(PriceLevel* new_level) {
+bool OrderBook::addPriceLevel(PriceLevel* new_level) {
   Side side = new_level->side;
   PriceLevel** head = (side == Side::BUY) ? &bids_ : &asks_;
 
   size_t index = priceToIndex(new_level->price);
+  if (!hasEmptyPriceSlot(price_level_map_, index)) {
+    return false;
+  }
+  while (price_level_map_[index] != nullptr) {
+    if (price_level_map_[index]->price == new_level->price) {
+      return false;
+    }
+    index = (index + 1) & (MAX_PRICE_LEVELS - 1);
+  }
   price_level_map_[index] = new_level;
 
   if (!*head) {
@@ -109,7 +159,7 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
     *head = new_level;
     new_level->prev = new_level;
     new_level->next = new_level;
-    return;
+    return true;
   }
 
   PriceLevel* current = *head;
@@ -122,7 +172,7 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
       current->prev->next = new_level;
       current->prev = new_level;
       *head = new_level;
-      return;
+      return true;
     }
 
     while (current->next != *head && current->next->price > new_level->price) {
@@ -138,7 +188,7 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
       current->prev->next = new_level;
       current->prev = new_level;
       *head = new_level;
-      return;
+      return true;
     }
 
     while (current->next != *head && current->next->price < new_level->price) {
@@ -153,6 +203,7 @@ void OrderBook::addPriceLevel(PriceLevel* new_level) {
   new_level->next = current->next;
   current->next->prev = new_level;
   current->next = new_level;
+  return true;
 }
 
 void OrderBook::removePriceLevel(PriceLevel* level) {
@@ -160,8 +211,10 @@ void OrderBook::removePriceLevel(PriceLevel* level) {
   PriceLevel** head = (side == Side::BUY) ? &bids_ : &asks_;
 
   // Remove from hash map
-  size_t index = priceToIndex(level->price);
-  price_level_map_[index] = nullptr;
+  size_t index = findPriceLevelIndex(price_level_map_, level->price);
+  if (index != MAX_PRICE_LEVELS) {
+    backwardShiftDeletePrice(price_level_map_, index);
+  }
 
   if (level->next == level) {
     // Only one level
@@ -318,7 +371,15 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
       }
       return;
     }
-    addPriceLevel(level);
+    if (!addPriceLevel(level)) {
+      level_pool_->deallocate(level);
+      order_pool_->deallocate(new_order);
+      size_t remove_idx = findOrderIndex(order_map_, order_id);
+      if (remove_idx != MAX_ORDERS) {
+        backwardShiftDelete(order_map_, remove_idx);
+      }
+      return;
+    }
   } else {
     // Add to existing price level
     Order* first = level->first_order;
