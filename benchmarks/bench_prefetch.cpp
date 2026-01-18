@@ -8,37 +8,37 @@
 
 using namespace impl;
 
-// 测试 addOrder 的性能（包含 PriceLevel 链表遍历）
+// Measure addOrder performance (includes PriceLevel list traversal).
 static void BM_AddOrder(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
 
-  // 预填充订单簿
+  // Pre-fill the order book.
   for (int i = 0; i < levels; i++) {
     ob.addOrder(i, 1000 + i, 100, Side::BUY);
     ob.addOrder(i + levels, 2000 - i, 100, Side::SELL);
   }
 
-  // 测试添加新订单的性能（PriceLevel 链表遍历）
+  // Measure adding new orders (PriceLevel list traversal).
   uint64_t order_id = 1000000;
   for (auto _ : state) {
-    // 添加一个不在边缘的新订单，需要遍历链表
+    // Add a non-edge order to force list traversal.
     ob.addOrder(order_id++, 1500, 100, Side::BUY);
     ob.addOrder(order_id++, 1500, 100, Side::SELL);
   }
 
-  // 清理
+  // Cleanup.
   ob.clear();
 }
 BENCHMARK(BM_AddOrder)->Range(10, 500);
 
-// 测试 modifyOrder 的性能（可能触发 PriceLevel 查找）
+// Measure modifyOrder performance (may trigger PriceLevel lookup).
 static void BM_ModifyOrder(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
   std::vector<uint64_t> order_ids;
 
-  // 预填充订单簿
+  // Pre-fill the order book.
   for (int i = 0; i < levels; i++) {
     ob.addOrder(i, 1000 + i, 100, Side::BUY);
     ob.addOrder(i + levels, 2000 - i, 100, Side::SELL);
@@ -46,26 +46,26 @@ static void BM_ModifyOrder(benchmark::State& state) {
     order_ids.push_back(i + levels);
   }
 
-  // 测试修改订单的性能
+  // Measure modifying orders.
   uint64_t idx = 0;
   for (auto _ : state) {
-    for (int i = 0; i < 10; i++) {  // 每次迭代修改10个订单
+    for (int i = 0; i < 10; i++) {  // Modify 10 orders per iteration.
       ob.modifyOrder(order_ids[idx++], 1000 + (i % levels), 200, Side::BUY);
     }
   }
 }
 BENCHMARK(BM_ModifyOrder)->Range(10, 500);
 
-// 测试 addOrder 批量插入（大量 PriceLevel 链表遍历）
+// Measure batched addOrder (heavy PriceLevel list traversal).
 static void BM_AddOrderBatch(benchmark::State& state) {
   const int batch_size = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
 
   for (auto _ : state) {
     ob.clear();
-    // 批量添加订单，每个新订单都需要遍历链表
+    // Batch insert; each new order traverses the list.
     for (int i = 0; i < batch_size; i++) {
-      // 插入到中间位置，最大化遍历距离
+      // Insert into the middle to maximize traversal distance.
       ob.addOrder(i, 1500 + (i % 100), 100, Side::BUY);
       ob.addOrder(i + batch_size, 1500 + (i % 100), 100, Side::SELL);
     }
@@ -73,13 +73,13 @@ static void BM_AddOrderBatch(benchmark::State& state) {
 }
 BENCHMARK(BM_AddOrderBatch)->Range(10, 200);
 
-// 测试 getImbalance 遍历（PriceLevel 链表遍历）
+// Measure getImbalance traversal (PriceLevel list traversal).
 static void BM_GetImbalance(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   const int k = static_cast<int>(state.range(1));
   OrderBook ob("TEST");
 
-  // 预填充订单簿
+  // Pre-fill the order book.
   for (int i = 0; i < levels; i++) {
     ob.addOrder(i, 1000 + i, 100, Side::BUY);
     ob.addOrder(i + levels, 2000 - i, 100, Side::SELL);
@@ -92,7 +92,7 @@ static void BM_GetImbalance(benchmark::State& state) {
 }
 BENCHMARK(BM_GetImbalance)->Ranges({{10, 500}, {5, 100}});
 
-// 测试 getBookPressure 遍历
+// Measure getBookPressure traversal.
 static void BM_GetBookPressure(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   const int k = static_cast<int>(state.range(1));
