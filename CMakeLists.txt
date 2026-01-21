@@ -13,7 +13,17 @@ FetchContent_Declare(
   GIT_TAG        v1.14.0
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+
+# Add Google Benchmark using FetchContent (gitee mirror)
+FetchContent_Declare(
+  googlebenchmark
+  GIT_REPOSITORY https://gitee.com/mirrors/google-benchmark.git
+  GIT_TAG        v1.8.0
+)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(googletest googlebenchmark)
 
 file(GLOB_RECURSE IMPL_SRC "impl/src/*.cpp")
 
@@ -41,3 +51,6 @@ endif()
 
 # Add tests subdirectory
 add_subdirectory(tests)
+
+# Add benchmarks subdirectory
+add_subdirectory(benchmarks)
