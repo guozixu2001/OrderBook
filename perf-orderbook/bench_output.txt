@@ -1,4 +1,4 @@
 ------------------------------------------------------------------------------------------------------
 Benchmark                                            Time             CPU   Iterations UserCounters...
 ------------------------------------------------------------------------------------------------------
-BM_OrderBookWorkload/ops:50000/trade_pct:10    1759782 ns      1759572 ns          804 items_per_second=28.416M/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10    1698735 ns      1698368 ns          832 items_per_second=29.44M/s

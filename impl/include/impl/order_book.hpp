@@ -37,24 +37,25 @@ struct alignas(64) BBO {
   uint32_t ask_qty = 0;
 };
 
-struct alignas(64) Order {
+struct Order {
   uint64_t order_id = 0;
   int32_t price = 0;
   uint32_t qty = 0;
   Side side = Side::BUY;
+  PriceLevel* level = nullptr;
 
   Order* prev = nullptr;
   Order* next = nullptr;
 
   Order(uint64_t id, int32_t p, uint32_t q, Side s)
-    : order_id(id), price(p), qty(q), side(s), prev(this), next(this) {}
+    : order_id(id), price(p), qty(q), side(s), level(nullptr), prev(this), next(this) {}
 
   Order() = default;
   Order(const Order&) = delete;
   Order& operator=(const Order&) = delete;
 };
 
-struct alignas(64) PriceLevel {
+struct PriceLevel {
   int32_t price = 0;
   Side side = Side::BUY;
   uint32_t total_qty = 0;     // Sum of all order quantities at this level
@@ -116,6 +117,10 @@ private:
 
   // Sliding window statistics for trade-based metrics (RingBuffer optimized)
   RingBufferSlidingWindowStats window_stats_;
+
+  // Occupancy counters to avoid full-table scans
+  size_t order_count_ = 0;
+  size_t price_level_count_ = 0;
 
   // Convert price to hash index
   size_t priceToIndex(int32_t price) const;

@@ -1,4 +1,4 @@
-2026-02-01T09:25:53+00:00
+2026-02-01T09:34:47+00:00
 Running /root/guozixu/tmp/build-perf/benchmarks/benchmarks
 Run on (44 X 2400 MHz CPU s)
 CPU Caches:
@@ -6,19 +6,19 @@ CPU Caches:
   L1 Instruction 64 KiB (x44)
   L2 Unified 512 KiB (x44)
   L3 Unified 16384 KiB (x44)
-Load Average: 0.09, 0.06, 0.02
-14817131072,,cycles,2709019100,46.00,,
-15144237040,,instructions,2704277730,46.00,1.02,insn per cycle
-3141938927,,branches,2683898240,46.00,,
-47336031,,branch-misses,2683473810,46.00,1.51,of all branches
-1716870929,,cache-references,2684385980,46.00,,
-119167264,,cache-misses,2685743540,46.00,6.94,of all cache refs
-5898831820,,L1-dcache-loads,2668413830,45.00,,
-1181597977,,L1-dcache-load-misses,2671100970,45.00,20.03,of all L1-dcache accesses
-738672,,L1-icache-load-misses,2678503250,46.00,,
+Load Average: 0.15, 0.03, 0.01
+15026237316,,cycles,2742876010,46.00,,
+15546628341,,instructions,2738821260,46.00,1.03,insn per cycle
+3098073722,,branches,2716485419,46.00,,
+48550365,,branch-misses,2715825739,46.00,1.57,of all branches
+2274851892,,cache-references,2715829119,46.00,,
+105043410,,cache-misses,2717870189,46.00,4.62,of all cache refs
+6167394305,,L1-dcache-loads,2701405609,45.00,,
+1433071058,,L1-dcache-load-misses,2705412239,45.00,23.24,of all L1-dcache accesses
+775432,,L1-icache-load-misses,2711569930,45.00,,
 <not supported>,,LLC-loads,0,100.00,,
 <not supported>,,LLC-load-misses,0,100.00,,
-293534749,,dTLB-loads,2691877780,46.00,,
-339718,,dTLB-load-misses,2692687940,46.00,0.12,of all dTLB cache accesses
-2201,,iTLB-loads,2692313170,46.00,,
-25641,,iTLB-load-misses,2690190560,46.00,1164.97,of all iTLB cache accesses
+276783215,,dTLB-loads,2727855350,46.00,,
+163289,,dTLB-load-misses,2728304160,46.00,0.06,of all dTLB cache accesses
+6781,,iTLB-loads,2728400580,46.00,,
+19662,,iTLB-load-misses,2726392110,46.00,289.96,of all iTLB cache accesses

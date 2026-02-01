@@ -1,9 +1,9 @@
-# OrderBook 性能指标案例（对标 4-11 风格）
+# OrderBook 性能指标
 
 ## 测试环境
 
 ```
-Date: 2026-02-01T09:34:41Z
+Date: 2026-02-01T09:25:48Z
 Linux sharp-game-fades-fin-03 6.8.0-90-generic #91-Ubuntu SMP PREEMPT_DYNAMIC Tue Nov 18 14:14:30 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
 ---- lscpu ----
 Architecture:                         x86_64
@@ -51,8 +51,8 @@ Vulnerability Tsx async abort:        Not affected
 Vulnerability Vmscape:                Not affected
 ---- meminfo ----
 MemTotal:       187511724 kB
-MemFree:        66825708 kB
-MemAvailable:   179363452 kB
+MemFree:        68180964 kB
+MemAvailable:   180717408 kB
 ```
 
 ## 工作负载
@@ -67,25 +67,29 @@ MemAvailable:   179363452 kB
 ------------------------------------------------------------------------------------------------------
 Benchmark                                            Time             CPU   Iterations UserCounters...
 ------------------------------------------------------------------------------------------------------
-BM_OrderBookWorkload/ops:50000/trade_pct:10    1698735 ns      1698368 ns          832 items_per_second=29.44M/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10    1759782 ns      1759572 ns          804 items_per_second=28.416M/s
 ```
 
 ## 性能指标表
 
 | 指标 | 值 | 说明 |
 |---|---:|---|
-| Instructions | 15546628341.0 | retired instructions |
-| Cycles | 15026237316.0 | CPU cycles |
-| IPC | 1.035 | instructions per cycle |
-| CPI | 0.967 | cycles per instruction |
-| Branch miss rate | 1.567% | branch-misses / branches |
-| Cache miss rate | 4.618% | cache-misses / cache-references |
-| L1D MPKI | 92.18 | L1-dcache-load-misses per 1K instr |
-| L1I MPKI | 0.050 | L1-icache-load-misses per 1K instr |
+| Instructions | 15144237040.0 | retired instructions |
+| Cycles | 14817131072.0 | CPU cycles |
+| IPC | 1.022 | instructions per cycle |
+| CPI | 0.978 | cycles per instruction |
+| Branch miss rate | 1.507% | branch-misses / branches |
+| Cache miss rate | 6.941% | cache-misses / cache-references |
+| L1D MPKI | 78.02 | L1-dcache-load-misses per 1K instr |
+| L1I MPKI | 0.049 | L1-icache-load-misses per 1K instr |
 | LLC MPKI | N/A | LLC-load-misses per 1K instr |
-| dTLB MPKI | 0.011 | dTLB-load-misses per 1K instr |
-| iTLB MPKI | 0.001 | iTLB-load-misses per 1K instr |
+| dTLB MPKI | 0.022 | dTLB-load-misses per 1K instr |
+| iTLB MPKI | 0.002 | iTLB-load-misses per 1K instr |
 
-## 结论（草稿）
+## 结论
 
-- L1D MPKI 偏高，数据局部性可能不足。
+- IPC ≈ 1.02，整体接近“每周期一条指令”，说明该负载的瓶颈更可能来自内存访问或分支控制，而非纯算力不足。  
+- 分支误预测率 1.51% 属于中等水平，对应大量 add/delete 的控制流并不完全可预测，但不是首要瓶颈。  
+- L1D MPKI = 78.02 明显偏高，数据局部性不足是主要信号，符合订单簿哈希/链表遍历的访问模式特征。  
+- L1I MPKI 与 TLB MPKI 极低，前端与地址转换不是当前瓶颈。  
+- LLC 事件在该平台 perf 不支持（N/A），需要用替代事件或采样工具验证是否存在更深层缓存压力。  

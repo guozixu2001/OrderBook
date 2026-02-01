@@ -124,30 +124,6 @@ size_t findPriceLevelIndex(const PriceLevelHashMap& map, int32_t price) {
   return MAX_PRICE_LEVELS;
 }
 
-bool hasEmptySlot(const OrderHashMap& map, size_t start_index) {
-  size_t mask = MAX_ORDERS - 1;
-  size_t index = start_index;
-  for (size_t probe = 0; probe < MAX_ORDERS; ++probe) {
-    if (!map[index]) {
-      return true;
-    }
-    index = (index + 1) & mask;
-  }
-  return false;
-}
-
-bool hasEmptyPriceSlot(const PriceLevelHashMap& map, size_t start_index) {
-  size_t mask = MAX_PRICE_LEVELS - 1;
-  size_t index = start_index;
-  for (size_t probe = 0; probe < MAX_PRICE_LEVELS; ++probe) {
-    if (!map[index]) {
-      return true;
-    }
-    index = (index + 1) & mask;
-  }
-  return false;
-}
-
 void backwardShiftDelete(OrderHashMap& map, size_t index) {
   size_t mask = MAX_ORDERS - 1;
   size_t hole = index;
@@ -190,6 +166,8 @@ OrderBook::OrderBook(const char* symbol) {
   order_map_.fill(nullptr);
   price_level_map_.fill(nullptr);
   bbo_ = {};
+  order_count_ = 0;
+  price_level_count_ = 0;
 
   // 16 cold tiers allows up to ~1M orders (65536 * 17)
   order_pool_ = new TieredMemoryPool<Order, MAX_ORDERS>(16);
@@ -218,10 +196,11 @@ bool OrderBook::addPriceLevel(PriceLevel* new_level) {
   Side side = new_level->side;
   PriceLevel** head = (side == Side::BUY) ? &bids_ : &asks_;
 
-  size_t index = priceToIndex(new_level->price);
-  if (!hasEmptyPriceSlot(price_level_map_, index)) {
+  if (unlikely(price_level_count_ >= MAX_PRICE_LEVELS)) {
     return false;
   }
+
+  size_t index = priceToIndex(new_level->price);
   while (price_level_map_[index] != nullptr) {
     if (price_level_map_[index]->price == new_level->price) {
       return false;
@@ -229,6 +208,7 @@ bool OrderBook::addPriceLevel(PriceLevel* new_level) {
     index = (index + 1) & (MAX_PRICE_LEVELS - 1);
   }
   price_level_map_[index] = new_level;
+  ++price_level_count_;
 
   if (!*head) {
     // First level
@@ -290,6 +270,9 @@ void OrderBook::removePriceLevel(PriceLevel* level) {
   size_t index = findPriceLevelIndex(price_level_map_, level->price);
   if (index != MAX_PRICE_LEVELS) {
     backwardShiftDeletePrice(price_level_map_, index);
+  }
+  if (price_level_count_ > 0) {
+    --price_level_count_;
   }
 
   if (level->next == level) {
@@ -354,8 +337,10 @@ void OrderBook::clear() {
     }
   }
   order_map_.fill(nullptr);
+  order_count_ = 0;
 
   price_level_map_.fill(nullptr);
+  price_level_count_ = 0;
 
   while (bids_) {
     PriceLevel* next = bids_->next;
@@ -399,8 +384,8 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
   if (unlikely(findOrderIndex(order_map_, order_id) != MAX_ORDERS)) {
     return;
   }
-  // Early exit: hash table is full (very unlikely)
-  if (unlikely(!hasEmptySlot(order_map_, start_index))) {
+  // Early exit: hash table is full
+  if (unlikely(order_count_ >= MAX_ORDERS)) {
     return;
   }
 
@@ -420,6 +405,12 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
     if (likely(current == nullptr)) {
       order_map_[index] = to_insert;
       break;
+    }
+
+    // Duplicate check (rare)
+    if (unlikely(current->order_id == order_id)) {
+      order_pool_->deallocate(new_order);
+      return;
     }
 
     // Robin Hood swap: give our slot to someone with shorter probe distance
@@ -484,7 +475,10 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
     level->order_count++;
   }
 
+  new_order->level = level;
+
   updateBBOSide(update_bid, update_ask);
+  ++order_count_;
 }
 
 void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
@@ -512,7 +506,10 @@ void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side
     addOrder(order_id, price, qty, side);
   } else {
     // Update quantity at same price (hot path)
-    PriceLevel* level = findPriceLevel(price);
+    PriceLevel* level = order->level;
+    if (unlikely(!level)) {
+      level = findPriceLevel(price);
+    }
     if (likely(level)) {
       const int32_t qty_diff = static_cast<int32_t>(qty) - static_cast<int32_t>(order->qty);
       order->qty = qty;
@@ -543,8 +540,11 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
   bool update_bid = false;
   bool update_ask = false;
 
-  PriceLevel* level = findPriceLevel(order->price);
-  if (unlikely(!level)) return;
+  PriceLevel* level = order->level;
+  if (unlikely(!level)) {
+    level = findPriceLevel(order->price);
+    if (unlikely(!level)) return;
+  }
 
   // Determine BBO update
   if (side == Side::BUY) {
@@ -573,6 +573,9 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
   // Remove from order map and deallocate
   backwardShiftDelete(order_map_, index);
   order_pool_->deallocate(order);
+  if (order_count_ > 0) {
+    --order_count_;
+  }
 
   updateBBOSide(update_bid, update_ask);
 }
@@ -605,7 +608,10 @@ void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t p
   } else {
     // Partial fill (hot path)
     order->qty -= qty;
-    PriceLevel* level = findPriceLevel(price);
+    PriceLevel* level = order->level;
+    if (unlikely(!level)) {
+      level = findPriceLevel(price);
+    }
     if (likely(level)) {
       level->total_qty -= qty;
     }
