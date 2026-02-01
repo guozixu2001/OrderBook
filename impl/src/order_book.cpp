@@ -16,6 +16,12 @@ size_t priceHash(int32_t price) {
   return static_cast<uint32_t>(price) & (MAX_PRICE_LEVELS - 1);
 }
 
+static Order* const kDeletedSentinel = reinterpret_cast<Order*>(1);
+
+inline bool isDeleted(const Order* entry) {
+  return entry == kDeletedSentinel;
+}
+
 // Optimized findOrderIndex with loop unrolling and branch prediction hints
 // Key optimizations:
 // 1. Moved boundary check out of hot loop (unroll by 4)
@@ -37,7 +43,7 @@ size_t findOrderIndex(const OrderHashMap& map, uint64_t order_id) {
     }
 
     // Fast path: order ID matches
-    if (likely(entry->order_id == order_id)) {
+    if (likely(!isDeleted(entry) && entry->order_id == order_id)) {
       return index;
     }
 
@@ -53,21 +59,21 @@ size_t findOrderIndex(const OrderHashMap& map, uint64_t order_id) {
     // Manual unroll for next 3 iterations (reduces branch overhead)
     entry = map[index];
     if (unlikely(entry == nullptr)) return MAX_ORDERS;
-    if (likely(entry->order_id == order_id)) return index;
+    if (likely(!isDeleted(entry) && entry->order_id == order_id)) return index;
     index = (index + 1) & mask;
     probe++;
     if (unlikely(index == start_index)) return MAX_ORDERS;
 
     entry = map[index];
     if (unlikely(entry == nullptr)) return MAX_ORDERS;
-    if (likely(entry->order_id == order_id)) return index;
+    if (likely(!isDeleted(entry) && entry->order_id == order_id)) return index;
     index = (index + 1) & mask;
     probe++;
     if (unlikely(index == start_index)) return MAX_ORDERS;
 
     entry = map[index];
     if (unlikely(entry == nullptr)) return MAX_ORDERS;
-    if (likely(entry->order_id == order_id)) return index;
+    if (likely(!isDeleted(entry) && entry->order_id == order_id)) return index;
     index = (index + 1) & mask;
     probe++;
     if (unlikely(index == start_index)) return MAX_ORDERS;
@@ -332,7 +338,7 @@ void OrderBook::updateBBOSide(bool update_bid, bool update_ask) {
 
 void OrderBook::clear() {
   for (Order* order : order_map_) {
-    if (order) {
+    if (order && !isDeleted(order)) {
       order_pool_->deallocate(order);
     }
   }
@@ -397,20 +403,35 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
   Order* to_insert = new_order;
   size_t index = start_index;
   size_t probe = 0;
+  size_t first_deleted = MAX_ORDERS;
 
   while (true) {
     Order* current = order_map_[index];
 
     // Fast path: empty slot found
     if (likely(current == nullptr)) {
-      order_map_[index] = to_insert;
+      if (first_deleted != MAX_ORDERS) {
+        order_map_[first_deleted] = to_insert;
+      } else {
+        order_map_[index] = to_insert;
+      }
       break;
     }
 
-    // Duplicate check (rare)
-    if (unlikely(current->order_id == order_id)) {
-      order_pool_->deallocate(new_order);
-      return;
+    if (unlikely(isDeleted(current))) {
+      if (first_deleted == MAX_ORDERS) {
+        first_deleted = index;
+      }
+      index = (index + 1) & mask;
+      ++probe;
+      if (unlikely(index == start_index)) {
+        if (first_deleted != MAX_ORDERS) {
+          order_map_[first_deleted] = to_insert;
+          break;
+        }
+        return;
+      }
+      continue;
     }
 
     // Robin Hood swap: give our slot to someone with shorter probe distance
@@ -425,6 +446,13 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
 
     index = (index + 1) & mask;
     ++probe;
+    if (unlikely(index == start_index)) {
+      if (first_deleted != MAX_ORDERS) {
+        order_map_[first_deleted] = to_insert;
+        break;
+      }
+      return;
+    }
   }
 
   // Determine BBO update flags using branchless comparison
@@ -450,7 +478,7 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
       order_pool_->deallocate(new_order);
       size_t remove_idx = findOrderIndex(order_map_, order_id);
       if (remove_idx != MAX_ORDERS) {
-        backwardShiftDelete(order_map_, remove_idx);
+        order_map_[remove_idx] = kDeletedSentinel;
       }
       return;
     }
@@ -460,7 +488,7 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
       order_pool_->deallocate(new_order);
       size_t remove_idx = findOrderIndex(order_map_, order_id);
       if (remove_idx != MAX_ORDERS) {
-        backwardShiftDelete(order_map_, remove_idx);
+        order_map_[remove_idx] = kDeletedSentinel;
       }
       return;
     }
@@ -571,7 +599,7 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
   }
 
   // Remove from order map and deallocate
-  backwardShiftDelete(order_map_, index);
+  order_map_[index] = kDeletedSentinel;
   order_pool_->deallocate(order);
   if (order_count_ > 0) {
     --order_count_;
