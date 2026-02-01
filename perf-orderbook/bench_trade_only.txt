@@ -1,0 +1,7 @@
+-------------------------------------------------------------------------------------------------
+Benchmark                                       Time             CPU   Iterations UserCounters...
+-------------------------------------------------------------------------------------------------
+BM_OrderBookTradeOnly/ops:50000_mean      4061061 ns      4060817 ns            5 items_per_second=12.3128M/s
+BM_OrderBookTradeOnly/ops:50000_median    4059291 ns      4059028 ns            5 items_per_second=12.3182M/s
+BM_OrderBookTradeOnly/ops:50000_stddev       5498 ns         5510 ns            5 items_per_second=16.7106k/s
+BM_OrderBookTradeOnly/ops:50000_cv           0.14 %          0.14 %             5 items_per_second=0.14%

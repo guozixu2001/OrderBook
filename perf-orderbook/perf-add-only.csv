@@ -1,0 +1,24 @@
+2026-02-01T09:57:46+00:00
+Running build-perf/benchmarks/benchmarks
+Run on (44 X 2400 MHz CPU s)
+CPU Caches:
+  L1 Data 64 KiB (x44)
+  L1 Instruction 64 KiB (x44)
+  L2 Unified 512 KiB (x44)
+  L3 Unified 16384 KiB (x44)
+Load Average: 0.12, 0.06, 0.02
+20544461587,,cycles,3720666280,46.00,,
+30083073914,,instructions,3713861020,46.00,1.46,insn per cycle
+5500253122,,branches,3683264790,45.00,,
+60864216,,branch-misses,3682604160,45.00,1.11,of all branches
+3334229393,,cache-references,3683544280,45.00,,
+40084699,,cache-misses,3687266790,46.00,1.20,of all cache refs
+10462284429,,L1-dcache-loads,3679080080,45.00,,
+2012429005,,L1-dcache-load-misses,3685558240,45.00,19.24,of all L1-dcache accesses
+924025,,L1-icache-load-misses,3695775600,46.00,,
+<not supported>,,LLC-loads,0,100.00,,
+<not supported>,,LLC-load-misses,0,100.00,,
+163133880,,dTLB-loads,3716440130,46.00,,
+1290552,,dTLB-load-misses,3716965120,46.00,0.79,of all dTLB cache accesses
+4546,,iTLB-loads,3716078560,46.00,,
+32260,,iTLB-load-misses,3712590950,46.00,709.63,of all iTLB cache accesses

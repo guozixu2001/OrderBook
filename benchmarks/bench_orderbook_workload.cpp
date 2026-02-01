@@ -20,6 +20,7 @@ struct WorkloadConfig {
   uint32_t init_orders;
   uint32_t max_active;
   uint32_t price_levels;
+  uint32_t max_qty;
 };
 
 struct WorkloadState {
@@ -94,7 +95,7 @@ struct WorkloadState {
     Side side = (seed & 1U) ? Side::BUY : Side::SELL;
     int32_t offset = static_cast<int32_t>((seed % cfg.price_levels) + 1);
     int32_t price = (side == Side::BUY) ? (kBasePrice - offset) : (kBasePrice + offset);
-    uint32_t qty = (seed % kMaxQty) + 1;
+    uint32_t qty = (seed % cfg.max_qty) + 1;
 
     ob.addOrder(id, price, qty, side);
 
@@ -122,7 +123,8 @@ static void BM_OrderBookWorkload(benchmark::State& state) {
     static_cast<uint32_t>(state.range(1)),
     20000,  // init_orders
     50000,  // max_active
-    2000    // price_levels
+    2000,   // price_levels
+    kMaxQty // max_qty
   };
 
   WorkloadState ws;
@@ -193,3 +195,135 @@ BENCHMARK(BM_OrderBookWorkload)
   ->Args({100000, 10})
   ->ArgNames({"ops", "trade_pct"});
 
+static void BM_OrderBookAddOnly(benchmark::State& state) {
+  const WorkloadConfig cfg{
+    static_cast<uint32_t>(state.range(0)),
+    0,
+    0,      // init_orders
+    50000,  // max_active
+    2000,   // price_levels
+    kMaxQty // max_qty
+  };
+
+  WorkloadState ws;
+  ws.reserve(cfg.max_active);
+  LcgRng rng;
+
+  for (auto _ : state) {
+    state.PauseTiming();
+    ws.reset(cfg);
+    state.ResumeTiming();
+
+    for (uint32_t i = 0; i < cfg.ops_per_iter; ++i) {
+      if (ws.active_ids.size() >= cfg.max_active || ws.free_ids.empty()) {
+        state.PauseTiming();
+        ws.reset(cfg);
+        state.ResumeTiming();
+      }
+      ws.addNewOrder(cfg, rng.next());
+    }
+
+    benchmark::DoNotOptimize(ws.ob.getBBO());
+  }
+
+  state.SetItemsProcessed(static_cast<int64_t>(state.iterations()) * cfg.ops_per_iter);
+}
+
+BENCHMARK(BM_OrderBookAddOnly)
+  ->Arg(50000)
+  ->ArgNames({"ops"});
+
+static void BM_OrderBookDeleteOnly(benchmark::State& state) {
+  const WorkloadConfig cfg{
+    static_cast<uint32_t>(state.range(0)),
+    0,
+    50000,  // init_orders
+    50000,  // max_active
+    2000,   // price_levels
+    kMaxQty // max_qty
+  };
+
+  WorkloadState ws;
+  ws.reserve(cfg.max_active);
+  LcgRng rng;
+
+  for (auto _ : state) {
+    state.PauseTiming();
+    ws.reset(cfg);
+    state.ResumeTiming();
+
+    for (uint32_t i = 0; i < cfg.ops_per_iter; ++i) {
+      if (ws.active_ids.empty()) {
+        state.PauseTiming();
+        ws.reset(cfg);
+        state.ResumeTiming();
+      }
+      uint32_t pick = rng.next() % ws.active_ids.size();
+      uint64_t id = ws.active_ids[pick];
+      ws.ob.deleteOrder(id, ws.order_side[id]);
+      ws.untrackActive(id);
+      ws.pushFreeId(id);
+      ws.order_qty[id] = 0;
+    }
+
+    benchmark::DoNotOptimize(ws.ob.getBBO());
+  }
+
+  state.SetItemsProcessed(static_cast<int64_t>(state.iterations()) * cfg.ops_per_iter);
+}
+
+BENCHMARK(BM_OrderBookDeleteOnly)
+  ->Arg(50000)
+  ->ArgNames({"ops"});
+
+static void BM_OrderBookTradeOnly(benchmark::State& state) {
+  const WorkloadConfig cfg{
+    static_cast<uint32_t>(state.range(0)),
+    100,
+    50000,   // init_orders
+    50000,   // max_active
+    2000,    // price_levels
+    10000    // max_qty (larger to reduce full-fill churn)
+  };
+
+  WorkloadState ws;
+  ws.reserve(cfg.max_active);
+  LcgRng rng;
+
+  for (auto _ : state) {
+    state.PauseTiming();
+    ws.reset(cfg);
+    uint64_t timestamp = 0;
+    state.ResumeTiming();
+
+    for (uint32_t i = 0; i < cfg.ops_per_iter; ++i) {
+      if (ws.active_ids.empty()) {
+        state.PauseTiming();
+        ws.reset(cfg);
+        timestamp = 0;
+        state.ResumeTiming();
+      }
+      uint32_t pick = rng.next() % ws.active_ids.size();
+      uint64_t id = ws.active_ids[pick];
+      uint32_t qty = ws.order_qty[id];
+      if (qty == 0) continue;
+      uint32_t trade_qty = 1;
+      ws.ob.processTrade(id, 1, ws.order_price[id], trade_qty, ws.order_side[id], timestamp++);
+      if (trade_qty >= qty) {
+        ws.untrackActive(id);
+        ws.pushFreeId(id);
+        ws.order_qty[id] = 0;
+      } else {
+        ws.order_qty[id] -= trade_qty;
+      }
+    }
+
+    benchmark::DoNotOptimize(ws.ob.getBBO());
+  }
+
+  state.SetItemsProcessed(static_cast<int64_t>(state.iterations()) * cfg.ops_per_iter);
+}
+
+BENCHMARK(BM_OrderBookTradeOnly)
+  ->Arg(50000)
+  ->ArgNames({"ops"});
