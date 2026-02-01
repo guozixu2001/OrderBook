@@ -1,4 +1,4 @@
-2026-02-01T10:12:53+00:00
+2026-02-01T10:40:51+00:00
 Running build-perf/benchmarks/benchmarks
 Run on (44 X 2400 MHz CPU s)
 CPU Caches:
@@ -6,19 +6,19 @@ CPU Caches:
   L1 Instruction 64 KiB (x44)
   L2 Unified 512 KiB (x44)
   L3 Unified 16384 KiB (x44)
-Load Average: 0.53, 0.27, 0.14
-78459711908,,cycles,14195322678,46.00,,
-81024432383,,instructions,14172595028,46.00,1.03,insn per cycle
-16098519200,,branches,14052832087,45.00,,
-128253151,,branch-misses,14047640438,45.00,0.80,of all branches
-11890461628,,cache-references,14045521628,45.00,,
-1133607045,,cache-misses,14057284248,45.00,9.53,of all cache refs
-32710312350,,L1-dcache-loads,14058756659,45.00,,
-7613877135,,L1-dcache-load-misses,14081967859,46.00,23.28,of all L1-dcache accesses
-3478348,,L1-icache-load-misses,14118756500,46.00,,
+Load Average: 0.43, 0.23, 0.14
+77405125084,,cycles,14004961390,46.00,,
+80764245097,,instructions,13982443160,46.00,1.04,insn per cycle
+15676672638,,branches,13866554550,45.00,,
+124914136,,branch-misses,13860530390,45.00,0.80,of all branches
+11842689135,,cache-references,13860708000,45.00,,
+1285556201,,cache-misses,13872134959,45.00,10.86,of all cache refs
+32326731352,,L1-dcache-loads,13861987697,45.00,,
+7660140549,,L1-dcache-load-misses,13884055037,45.00,23.70,of all L1-dcache accesses
+3606173,,L1-icache-load-misses,13920607537,46.00,,
 <not supported>,,LLC-loads,0,100.00,,
 <not supported>,,LLC-load-misses,0,100.00,,
-1874767393,,dTLB-loads,14202858930,46.00,,
-2764709,,dTLB-load-misses,14206498529,46.00,0.15,of all dTLB cache accesses
-10295,,iTLB-loads,14208040049,46.00,,
-93616,,iTLB-load-misses,14197994129,46.00,909.33,of all iTLB cache accesses
+2010006383,,dTLB-loads,13999671537,46.00,,
+2342969,,dTLB-load-misses,14005992687,46.00,0.12,of all dTLB cache accesses
+35256,,iTLB-loads,14005078268,46.00,,
+90842,,iTLB-load-misses,13996360130,46.00,257.66,of all iTLB cache accesses

@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------------------------
 Benchmark                                        Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------------------------
-BM_OrderBookDeleteOnly/ops:50000_mean      1568804 ns      1568530 ns            5 items_per_second=31.8782M/s
-BM_OrderBookDeleteOnly/ops:50000_median    1561565 ns      1561325 ns            5 items_per_second=32.0241M/s
-BM_OrderBookDeleteOnly/ops:50000_stddev      10766 ns        10768 ns            5 items_per_second=218.302k/s
-BM_OrderBookDeleteOnly/ops:50000_cv           0.69 %          0.69 %             5 items_per_second=0.68%
+BM_OrderBookDeleteOnly/ops:50000_mean      1644279 ns      1643977 ns            5 items_per_second=30.4141M/s
+BM_OrderBookDeleteOnly/ops:50000_median    1643871 ns      1643580 ns            5 items_per_second=30.4214M/s
+BM_OrderBookDeleteOnly/ops:50000_stddev       3296 ns         3259 ns            5 items_per_second=60.3235k/s
+BM_OrderBookDeleteOnly/ops:50000_cv           0.20 %          0.20 %             5 items_per_second=0.20%

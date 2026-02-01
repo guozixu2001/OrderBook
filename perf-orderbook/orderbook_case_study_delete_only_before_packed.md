@@ -67,28 +67,31 @@ MemAvailable:   179363452 kB
 --------------------------------------------------------------------------------------------------
 Benchmark                                        Time             CPU   Iterations UserCounters...
 --------------------------------------------------------------------------------------------------
-BM_OrderBookDeleteOnly/ops:50000_mean      1644279 ns      1643977 ns            5 items_per_second=30.4141M/s
-BM_OrderBookDeleteOnly/ops:50000_median    1643871 ns      1643580 ns            5 items_per_second=30.4214M/s
-BM_OrderBookDeleteOnly/ops:50000_stddev       3296 ns         3259 ns            5 items_per_second=60.3235k/s
-BM_OrderBookDeleteOnly/ops:50000_cv           0.20 %          0.20 %             5 items_per_second=0.20%
+BM_OrderBookDeleteOnly/ops:50000_mean      1659821 ns      1659486 ns            5 items_per_second=30.1302M/s
+BM_OrderBookDeleteOnly/ops:50000_median    1662212 ns      1661873 ns            5 items_per_second=30.0865M/s
+BM_OrderBookDeleteOnly/ops:50000_stddev       6285 ns         6295 ns            5 items_per_second=114.591k/s
+BM_OrderBookDeleteOnly/ops:50000_cv           0.38 %          0.38 %             5 items_per_second=0.38%
 ```
 
 ## 性能指标表
 
 | 指标 | 值 | 说明 |
 |---|---:|---|
-| Instructions | 80764245097.0 | retired instructions |
-| Cycles | 77405125084.0 | CPU cycles |
-| IPC | 1.043 | instructions per cycle |
-| CPI | 0.958 | cycles per instruction |
-| Branch miss rate | 0.797% | branch-misses / branches |
-| Cache miss rate | 10.86% | cache-misses / cache-references |
-| L1D MPKI | 94.85 | L1-dcache-load-misses per 1K instr |
-| L1I MPKI | 0.045 | L1-icache-load-misses per 1K instr |
+| Instructions | 82664768629.0 | retired instructions |
+| Cycles | 76228260595.0 | CPU cycles |
+| IPC | 1.084 | instructions per cycle |
+| CPI | 0.922 | cycles per instruction |
+| Branch miss rate | 0.744% | branch-misses / branches |
+| Cache miss rate | 10.10% | cache-misses / cache-references |
+| L1D MPKI | 90.49 | L1-dcache-load-misses per 1K instr |
+| L1I MPKI | 0.040 | L1-icache-load-misses per 1K instr |
 | LLC MPKI | N/A | LLC-load-misses per 1K instr |
-| dTLB MPKI | 0.029 | dTLB-load-misses per 1K instr |
+| dTLB MPKI | 0.022 | dTLB-load-misses per 1K instr |
 | iTLB MPKI | 0.001 | iTLB-load-misses per 1K instr |
 
-## 结论（草稿）
+## 结论与分析
 
-- L1D MPKI 偏高，数据局部性可能不足。
+- 本轮“index 化”后吞吐下降到 30.13M/s（相对上轮 31.88M/s 回退），说明额外的索引解码/访问成本抵消了收益。  
+- IPC 上升到 1.084、分支误预测降到 0.744%，同时 L1D MPKI 下降到 90.49，显示局部性略有改善。  
+- Cache miss rate 升到 10.10%，整体仍是内存瓶颈路径。  
+- 结论：index 化带来了“局部性改善但吞吐回退”的结果，需要进一步优化索引访问路径或回退到前一版。  
