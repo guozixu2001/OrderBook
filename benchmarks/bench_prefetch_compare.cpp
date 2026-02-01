@@ -7,7 +7,7 @@
 
 using namespace impl;
 
-// 模拟链表遍历的微基准测试（对比有无预取）
+// Microbenchmark for list traversal (compare with/without prefetch).
 struct Node {
   int value;
   Node* next;
@@ -18,12 +18,12 @@ static Node* create_list(int size) {
   auto* nodes = new Node[size];
   for (int i = 0; i < size; i++) {
     nodes[i].value = i;
-    nodes[i].next = &nodes[i + 1 < size ? i + 1 : 0];  // 循环链表
+    nodes[i].next = &nodes[i + 1 < size ? i + 1 : 0];  // Circular list.
   }
   return nodes;
 }
 
-// 版本1: 无预取 - 原始代码模式
+// Version 1: no prefetch, baseline pattern.
 static void BM_TraverseNoPrefetch(benchmark::State& state) {
   const int size = static_cast<int>(state.range(0));
   Node* head = create_list(size);
@@ -42,7 +42,7 @@ static void BM_TraverseNoPrefetch(benchmark::State& state) {
 }
 BENCHMARK(BM_TraverseNoPrefetch)->Range(10, 2000);
 
-// 版本2: 有预取 - 优化代码模式
+// Version 2: with prefetch, optimized pattern.
 static void BM_TraverseWithPrefetch(benchmark::State& state) {
   const int size = static_cast<int>(state.range(0));
   Node* head = create_list(size);
@@ -52,7 +52,7 @@ static void BM_TraverseWithPrefetch(benchmark::State& state) {
     Node* current = head;
     while (current->next != head && current->next->value < 500000) {
       sum += current->value;
-      // 预取下下个节点的 next 指针
+      // Prefetch the next-next node's next pointer.
       __builtin_prefetch(current->next->next, 0, 3);
       current = current->next;
     }
@@ -63,13 +63,13 @@ static void BM_TraverseWithPrefetch(benchmark::State& state) {
 }
 BENCHMARK(BM_TraverseWithPrefetch)->Range(10, 2000);
 
-// 实际 OrderBook 测试: addOrder 批量插入（中间位置插入，强制遍历）
+// OrderBook test: batched addOrder (mid-list inserts to force traversal).
 static void BM_AddOrderMiddle(benchmark::State& state) {
   const int initial_levels = static_cast<int>(state.range(0));
   const int batch_size = static_cast<int>(state.range(1));
   OrderBook ob("TEST");
 
-  // 预填充订单簿，创建有序链表
+  // Pre-fill the order book to build ordered lists.
   for (int i = 0; i < initial_levels; i++) {
     ob.addOrder(i, 1000 + i * 10, 100, Side::BUY);
     ob.addOrder(i + initial_levels, 2000 - i * 10, 100, Side::SELL);
@@ -77,14 +77,14 @@ static void BM_AddOrderMiddle(benchmark::State& state) {
 
   for (auto _ : state) {
     ob.clear();
-    // 重建订单簿
+    // Rebuild the order book.
     for (int i = 0; i < initial_levels; i++) {
       ob.addOrder(i, 1000 + i * 10, 100, Side::BUY);
       ob.addOrder(i + initial_levels, 2000 - i * 10, 100, Side::SELL);
     }
-    // 批量插入到链表中间位置（强制遍历）
+    // Batch insert into the middle of the list (forces traversal).
     for (int i = 0; i < batch_size; i++) {
-      int price = 1400 + (i % 100);  // 插入到中间位置
+      int price = 1400 + (i % 100);  // Insert into the middle.
       ob.addOrder(1000000 + i, price, 100, Side::BUY);
       ob.addOrder(2000000 + i, price, 100, Side::SELL);
     }

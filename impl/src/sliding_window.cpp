@@ -297,8 +297,8 @@ void SlidingWindowStats::evictExpired(uint64_t current_timestamp_yyyymmddhhmmss)
     size_t tail_idx = (head_ + (MAX_TRADES - count_)) % MAX_TRADES;
     uint64_t tail_time = timestamps_[tail_idx];  // tail_time is in Unix seconds
 
-    // Window: [cutoff_seconds, current_seconds) - 包含 cutoff_seconds，不包含 current_seconds
-    // 即：包含 10分钟前到当前秒之前的数据，不包含当前这一秒
+    // Window: [cutoff_seconds, current_seconds) includes cutoff_seconds, excludes current_seconds.
+    // In other words, include data from 10 minutes ago up to (but not including) the current second.
     if (tail_time >= cutoff_seconds && tail_time < current_seconds) {
       break;  // All remaining trades are within window
     }
@@ -371,31 +371,31 @@ int32_t SlidingWindowStats::getVWAPLevel(const OrderBook* ob) const {
 
   int32_t vwap_price = static_cast<int32_t>(vwap);
 
-  // 1. 检查 Ask 侧 (如果 VWAP 落在 Ask 区域：大于等于最佳卖价)
+  // 1. Check the ask side (VWAP in ask region: >= best ask).
   if (ob->getAskLevels() > 0) {
     int32_t best_ask = ob->getAskPrice(0);
     if (vwap_price >= best_ask) {
       size_t ask_levels = ob->getAskLevels();
       for (size_t i = 0; i < ask_levels; i++) {
         int32_t price = ob->getAskPrice(i);
-        // Ask 逻辑：找到包含该 VWAP 的档位 (vwap <= ask_price)
+        // Ask logic: find the level containing VWAP (vwap <= ask_price).
         if (vwap_price <= price) {
           return static_cast<int32_t>(-static_cast<int32_t>(i));
         }
       }
-      // 如果比最差的 Ask 还高，这里返回 0 或你需要定义的 "Out of Book"
+      // If VWAP is above the worst ask, return 0 (or define an out-of-book value).
       return 0;
     }
   }
 
-  // 2. 检查 Bid 侧 (如果 VWAP 落在 Bid 区域：小于等于最佳买价)
+  // 2. Check the bid side (VWAP in bid region: <= best bid).
   if (ob->getBidLevels() > 0) {
     int32_t best_bid = ob->getBidPrice(0);
     if (vwap_price <= best_bid) {
       size_t bid_levels = ob->getBidLevels();
       for (size_t i = 0; i < bid_levels; i++) {
         int32_t price = ob->getBidPrice(i);
-        // Bid 逻辑：找到包含该 VWAP 的档位 (vwap >= bid_price)
+        // Bid logic: find the level containing VWAP (vwap >= bid_price).
         if (vwap_price >= price) {
           return static_cast<int32_t>(i);
         }

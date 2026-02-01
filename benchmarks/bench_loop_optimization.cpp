@@ -7,7 +7,7 @@
 
 using namespace impl;
 
-// 原始版本 (while + break) - 用于对比
+// Old version (while + break) for comparison.
 // size_t getBidLevels_old(const PriceLevel* bids) {
 //   size_t count = 0;
 //   const PriceLevel* current = bids;
@@ -19,7 +19,7 @@ using namespace impl;
 //   return count;
 // }
 
-// 微基准: 模拟原始 while + break 模式
+// Microbenchmark: simulate the old while + break pattern.
 static void BM_OldLoopPattern(benchmark::State& state) {
   const int head = static_cast<int>(state.range(0));
   volatile int sum = 0;
@@ -37,7 +37,7 @@ static void BM_OldLoopPattern(benchmark::State& state) {
 }
 BENCHMARK(BM_OldLoopPattern)->Range(10, 1000);
 
-// 微基准: 优化后的 do-while 模式
+// Microbenchmark: optimized do-while pattern.
 static void BM_NewLoopPattern(benchmark::State& state) {
   const int head = static_cast<int>(state.range(0));
   volatile int sum = 0;
@@ -54,12 +54,12 @@ static void BM_NewLoopPattern(benchmark::State& state) {
 }
 BENCHMARK(BM_NewLoopPattern)->Range(10, 1000);
 
-// 实际 OrderBook 测试: getBidLevels + getAskLevels
+// OrderBook test: getBidLevels + getAskLevels.
 static void BM_OrderBookGetLevels(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
 
-  // 添加测试数据
+  // Add test data.
   for (int i = 0; i < levels; i++) {
     ob.addOrder(i, 1000 + i, 100, Side::BUY);
     ob.addOrder(i + levels, 2000 - i, 100, Side::SELL);
@@ -73,7 +73,7 @@ static void BM_OrderBookGetLevels(benchmark::State& state) {
 }
 BENCHMARK(BM_OrderBookGetLevels)->Range(10, 500);
 
-// 测试 getImbalance (遍历 k 个档位)
+// Test getImbalance (traverse k levels).
 static void BM_OrderBookGetImbalance(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   const int k = static_cast<int>(state.range(1));
@@ -91,7 +91,7 @@ static void BM_OrderBookGetImbalance(benchmark::State& state) {
 }
 BENCHMARK(BM_OrderBookGetImbalance)->Ranges({{10, 500}, {5, 100}});
 
-// 测试 getBookPressure (遍历 k 个档位)
+// Test getBookPressure (traverse k levels).
 static void BM_OrderBookGetBookPressure(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   const int k = static_cast<int>(state.range(1));

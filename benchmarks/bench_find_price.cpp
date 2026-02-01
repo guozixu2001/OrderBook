@@ -6,7 +6,7 @@
 
 using namespace impl;
 
-// 基准测试：findPriceLevel - 查找存在的价格
+// Benchmark: findPriceLevel - existing price lookup.
 static void BM_FindPriceLevelHit(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
@@ -25,7 +25,7 @@ static void BM_FindPriceLevelHit(benchmark::State& state) {
 }
 BENCHMARK(BM_FindPriceLevelHit)->Range(10, 500);
 
-// 基准测试：findPriceLevel - 查找不存在的价格
+// Benchmark: findPriceLevel - missing price lookup.
 static void BM_FindPriceLevelMiss(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
@@ -37,14 +37,14 @@ static void BM_FindPriceLevelMiss(benchmark::State& state) {
 
   for (auto _ : state) {
     for (int i = 0; i < levels; i++) {
-      volatile PriceLevel* level = ob.findPriceLevel(3000 + i);  // 不存在的价格
+      volatile PriceLevel* level = ob.findPriceLevel(3000 + i);  // Missing price.
       benchmark::DoNotOptimize(level);
     }
   }
 }
 BENCHMARK(BM_FindPriceLevelMiss)->Range(10, 500);
 
-// 基准测试：findPriceLevel - 混合查找
+// Benchmark: findPriceLevel - mixed lookup.
 static void BM_FindPriceLevelMixed(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");

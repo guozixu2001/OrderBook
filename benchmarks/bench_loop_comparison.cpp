@@ -6,7 +6,7 @@
 
 using namespace impl;
 
-// 模拟原始版本的 getBidLevels (while + break)
+// Simulate the old getBidLevels (while + break).
 static size_t getBidLevels_old(const PriceLevel* bids) {
   size_t count = 0;
   const PriceLevel* current = bids;
@@ -18,7 +18,7 @@ static size_t getBidLevels_old(const PriceLevel* bids) {
   return count;
 }
 
-// 模拟优化版本的 getBidLevels (do-while)
+// Simulate the optimized getBidLevels (do-while).
 static size_t getBidLevels_new(const PriceLevel* bids) {
   if (!bids) return 0;
   size_t count = 0;
@@ -31,7 +31,7 @@ static size_t getBidLevels_new(const PriceLevel* bids) {
   return count;
 }
 
-// 辅助函数：创建测试数据
+// Helper to build test data.
 void setup_orderbook(OrderBook& ob, int levels) {
   for (int i = 0; i < levels; i++) {
     ob.addOrder(i, 1000 + i, 100, Side::BUY);
@@ -39,39 +39,39 @@ void setup_orderbook(OrderBook& ob, int levels) {
   }
 }
 
-// 基准测试：原始版本 vs 优化版本 (微基准)
+// Benchmark: old vs optimized (microbenchmark).
 static void BM_OldLoop(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
   setup_orderbook(ob, levels);
-  const PriceLevel* bids = ob.getBBO() ? nullptr : nullptr;  // 间接获取 bids
+  const PriceLevel* bids = ob.getBBO() ? nullptr : nullptr;  // Indirectly fetch bids.
 
-  // 重新获取 bids 指针 (通过 getBidPrice 间接访问)
+  // Re-fetch the bids pointer (indirectly via getBidPrice).
   int32_t dummy = 0;
   for (int i = 0; i < levels; i++) {
     dummy = ob.getBidPrice(i);
   }
 
   for (auto _ : state) {
-    // 使用新版本 (当前已优化)
+    // Use the optimized version (current implementation).
     volatile size_t count = ob.getBidLevels();
     benchmark::DoNotOptimize(count);
   }
 }
 BENCHMARK(BM_OldLoop)->Range(10, 500);
 
-// 对比测试：手动实现原始版本
+// Comparison test: manual old implementation.
 static void BM_OldLoopManual(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");
   setup_orderbook(ob, levels);
 
-  // 获取 bids 指针的技巧：通过 getBidPrice 访问
+  // Trick to get bids pointer: access via getBidPrice.
   int32_t first_bid = ob.getBidPrice(0);
   benchmark::DoNotOptimize(first_bid);
 
   for (auto _ : state) {
-    // 模拟原始版本
+    // Simulate the old version.
     size_t count = 0;
     int32_t price = 0;
     do {
@@ -83,7 +83,7 @@ static void BM_OldLoopManual(benchmark::State& state) {
 }
 BENCHMARK(BM_OldLoopManual)->Range(10, 500);
 
-// 更精确的微基准：内联比较
+// More precise microbenchmark: inline comparison.
 struct ListNode {
   int value;
   ListNode* next;
@@ -101,7 +101,7 @@ static ListNode* create_list(int size) {
   return nodes;
 }
 
-// 原始版本 (while + break)
+// Old version (while + break).
 static void BM_OldLoopInline(benchmark::State& state) {
   const int size = static_cast<int>(state.range(0));
   ListNode* head = create_list(size);
@@ -121,7 +121,7 @@ static void BM_OldLoopInline(benchmark::State& state) {
 }
 BENCHMARK(BM_OldLoopInline)->Range(10, 1000);
 
-// 优化版本 (do-while)
+// Optimized version (do-while).
 static void BM_NewLoopInline(benchmark::State& state) {
   const int size = static_cast<int>(state.range(0));
   ListNode* head = create_list(size);
@@ -143,7 +143,7 @@ static void BM_NewLoopInline(benchmark::State& state) {
 }
 BENCHMARK(BM_NewLoopInline)->Range(10, 1000);
 
-// 实际 OrderBook 指标计算测试
+// Real OrderBook metrics test.
 static void BM_GetLevelsOptimized(benchmark::State& state) {
   const int levels = static_cast<int>(state.range(0));
   OrderBook ob("TEST");

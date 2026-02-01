@@ -25,7 +25,7 @@ static void BM_AddOrder(benchmark::State& state) {
     }
     state.SetItemsProcessed(state.iterations() * state.range(0));
 }
-// Range(1000, 10000) 表示每次 batch 插入 1000 到 10000 个订单
+// Range(1000, 10000) means each batch inserts 1000 to 10000 orders.
 BENCHMARK(BM_AddOrder)->Range(1000, 10000); 
 
 // ==========================================
