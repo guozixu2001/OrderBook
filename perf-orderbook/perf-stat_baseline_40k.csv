@@ -1,0 +1,24 @@
+2026-02-01T13:22:39+00:00
+Running /root/guozixu/tmp/build-perf/benchmarks/benchmarks
+Run on (44 X 2400 MHz CPU s)
+CPU Caches:
+  L1 Data 64 KiB (x44)
+  L1 Instruction 64 KiB (x44)
+  L2 Unified 512 KiB (x44)
+  L3 Unified 16384 KiB (x44)
+Load Average: 0.56, 0.36, 0.22
+24940100569,,cycles,4543119380,46.00,,
+80595695700,,instructions,4536735290,46.00,3.23,insn per cycle
+25989606353,,branches,4498325650,45.00,,
+56562732,,branch-misses,4496944200,45.00,0.22,of all branches
+9268119151,,cache-references,4497129720,45.00,,
+976351674,,cache-misses,4499921950,46.00,10.53,of all cache refs
+14423741479,,L1-dcache-loads,4486677270,45.00,,
+6986088870,,L1-dcache-load-misses,4493305260,45.00,48.43,of all L1-dcache accesses
+1406082,,L1-icache-load-misses,4504964180,46.00,,
+<not supported>,,LLC-loads,0,100.00,,
+<not supported>,,LLC-load-misses,0,100.00,,
+2524391676,,dTLB-loads,4531340270,46.00,,
+1605688,,dTLB-load-misses,4533009820,46.00,0.06,of all dTLB cache accesses
+1557,,iTLB-loads,4532863010,46.00,,
+25869,,iTLB-load-misses,4530481520,46.00,1661.46,of all iTLB cache accesses

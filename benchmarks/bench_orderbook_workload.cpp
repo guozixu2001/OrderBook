@@ -122,7 +122,7 @@ static void BM_OrderBookWorkload(benchmark::State& state) {
     static_cast<uint32_t>(state.range(0)),
     static_cast<uint32_t>(state.range(1)),
     20000,  // init_orders
-    50000,  // max_active
+    40000,  // max_active
     2000,   // price_levels
     kMaxQty // max_qty
   };
@@ -200,7 +200,7 @@ static void BM_OrderBookAddOnly(benchmark::State& state) {
     static_cast<uint32_t>(state.range(0)),
     0,
     0,      // init_orders
-    50000,  // max_active
+    40000,  // max_active
     2000,   // price_levels
     kMaxQty // max_qty
   };
@@ -238,7 +238,7 @@ static void BM_OrderBookDeleteOnly(benchmark::State& state) {
     static_cast<uint32_t>(state.range(0)),
     0,
     50000,  // init_orders
-    50000,  // max_active
+    40000,  // max_active
     2000,   // price_levels
     kMaxQty // max_qty
   };
@@ -281,7 +281,7 @@ static void BM_OrderBookTradeOnly(benchmark::State& state) {
     static_cast<uint32_t>(state.range(0)),
     100,
     50000,   // init_orders
-    50000,   // max_active
+    40000,   // max_active
     2000,    // price_levels
     10000    // max_qty (larger to reduce full-fill churn)
   };

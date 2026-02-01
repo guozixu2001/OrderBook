@@ -3,86 +3,17 @@
 #include <algorithm>
 #include <cmath>
 #include <ctime>
+#include <limits>
 
 namespace impl {
 
 namespace {
 
-size_t orderHash(uint64_t order_id) {
-  return static_cast<size_t>(order_id) & (MAX_ORDERS - 1);
-}
-
 size_t priceHash(int32_t price) {
   return static_cast<uint32_t>(price) & (MAX_PRICE_LEVELS - 1);
 }
 
-static Order* const kDeletedSentinel = reinterpret_cast<Order*>(1);
-
-inline bool isDeleted(const Order* entry) {
-  return entry == kDeletedSentinel;
-}
-
-// Optimized findOrderIndex with loop unrolling and branch prediction hints
-// Key optimizations:
-// 1. Moved boundary check out of hot loop (unroll by 4)
-// 2. Use likely/unlikely hints for common paths
-// 3. Reduced pointer dereferences
-size_t findOrderIndex(const OrderHashMap& map, uint64_t order_id) {
-  const size_t mask = MAX_ORDERS - 1;
-  size_t index = orderHash(order_id);
-  const size_t start_index = index;
-
-  // Unroll loop by 4 to reduce branch prediction pressure
-  // Common case: 1-4 probes finds the entry or returns nullptr
-  for (size_t probe = 0; probe < MAX_ORDERS; ) {
-    Order* entry = map[index];
-
-    // Fast path: empty slot means not found
-    if (unlikely(entry == nullptr)) {
-      return MAX_ORDERS;
-    }
-
-    // Fast path: order ID matches
-    if (likely(!isDeleted(entry) && entry->order_id == order_id)) {
-      return index;
-    }
-
-    // Advance to next slot
-    index = (index + 1) & mask;
-    probe++;
-
-    // Check for full loop (unlikely - only when table is full)
-    if (unlikely(index == start_index)) {
-      return MAX_ORDERS;
-    }
-
-    // Manual unroll for next 3 iterations (reduces branch overhead)
-    entry = map[index];
-    if (unlikely(entry == nullptr)) return MAX_ORDERS;
-    if (likely(!isDeleted(entry) && entry->order_id == order_id)) return index;
-    index = (index + 1) & mask;
-    probe++;
-    if (unlikely(index == start_index)) return MAX_ORDERS;
-
-    entry = map[index];
-    if (unlikely(entry == nullptr)) return MAX_ORDERS;
-    if (likely(!isDeleted(entry) && entry->order_id == order_id)) return index;
-    index = (index + 1) & mask;
-    probe++;
-    if (unlikely(index == start_index)) return MAX_ORDERS;
-
-    entry = map[index];
-    if (unlikely(entry == nullptr)) return MAX_ORDERS;
-    if (likely(!isDeleted(entry) && entry->order_id == order_id)) return index;
-    index = (index + 1) & mask;
-    probe++;
-    if (unlikely(index == start_index)) return MAX_ORDERS;
-  }
-
-  return MAX_ORDERS;
-}
-
-// Optimized findPriceLevelIndex with same optimizations as findOrderIndex
+// Optimized findPriceLevelIndex with loop unrolling and branch prediction hints
 size_t findPriceLevelIndex(const PriceLevelHashMap& map, int32_t price) {
   const size_t mask = MAX_PRICE_LEVELS - 1;
   size_t index = priceHash(price);
@@ -130,23 +61,6 @@ size_t findPriceLevelIndex(const PriceLevelHashMap& map, int32_t price) {
   return MAX_PRICE_LEVELS;
 }
 
-void backwardShiftDelete(OrderHashMap& map, size_t index) {
-  size_t mask = MAX_ORDERS - 1;
-  size_t hole = index;
-  size_t next = (hole + 1) & mask;
-  while (map[next] != nullptr) {
-    size_t home = orderHash(map[next]->order_id);
-    size_t dist = (next - home) & mask;
-    if (dist == 0) {
-      break;
-    }
-    map[hole] = map[next];
-    hole = next;
-    next = (next + 1) & mask;
-  }
-  map[hole] = nullptr;
-}
-
 void backwardShiftDeletePrice(PriceLevelHashMap& map, size_t index) {
   size_t mask = MAX_PRICE_LEVELS - 1;
   size_t hole = index;
@@ -166,17 +80,235 @@ void backwardShiftDeletePrice(PriceLevelHashMap& map, size_t index) {
 
 }  // namespace
 
+size_t OrderIndexMap::nextPow2(size_t value) {
+  if (value <= 1) return 1;
+  --value;
+  value |= value >> 1;
+  value |= value >> 2;
+  value |= value >> 4;
+  value |= value >> 8;
+  value |= value >> 16;
+  if (sizeof(size_t) >= 8) {
+    value |= value >> 32;
+  }
+  return value + 1;
+}
+
+OrderIndexMap::OrderIndexMap(size_t initial_capacity) {
+  size_t capacity = nextPow2(std::max(initial_capacity, kMinCapacity));
+  ctrl_.assign(capacity, kEmpty);
+  keys_.resize(capacity);
+  idxs_.resize(capacity);
+  capacity_ = capacity;
+}
+
+void OrderIndexMap::clear() {
+  std::fill(ctrl_.begin(), ctrl_.end(), kEmpty);
+  size_ = 0;
+  tombstones_ = 0;
+}
+
+static inline size_t hashKey(uint64_t key) {
+  return static_cast<size_t>(key * 11400714819323198485ull);
+}
+
+bool OrderIndexMap::find(uint64_t key, uint32_t* idx_out) const {
+  if (capacity_ == 0) return false;
+  const size_t mask = capacity_ - 1;
+  const size_t hash = hashKey(key);
+  const uint8_t h2 = static_cast<uint8_t>((hash >> 7) & 0x7F);
+  size_t index = hash & mask;
+
+  for (size_t probe = 0; probe < capacity_; probe += kGroupSize) {
+    size_t group_start = index & mask;
+    for (size_t i = 0; i < kGroupSize; ++i) {
+      size_t slot = (group_start + i) & mask;
+      uint8_t ctrl = ctrl_[slot];
+      if (ctrl == kEmpty) {
+        return false;
+      }
+      if (ctrl == h2 && keys_[slot] == key) {
+        if (idx_out) {
+          *idx_out = idxs_[slot];
+        }
+        return true;
+      }
+    }
+    index = (group_start + kGroupSize) & mask;
+  }
+  return false;
+}
+
+void OrderIndexMap::rehash(size_t new_capacity) {
+  size_t capacity = nextPow2(std::max(new_capacity, kMinCapacity));
+  std::vector<uint8_t> new_ctrl(capacity, kEmpty);
+  std::vector<uint64_t> new_keys(capacity);
+  std::vector<uint32_t> new_idxs(capacity);
+
+  const size_t old_capacity = capacity_;
+  const auto old_ctrl = std::move(ctrl_);
+  const auto old_keys = std::move(keys_);
+  const auto old_idxs = std::move(idxs_);
+
+  ctrl_ = std::move(new_ctrl);
+  keys_ = std::move(new_keys);
+  idxs_ = std::move(new_idxs);
+  capacity_ = capacity;
+  size_ = 0;
+  tombstones_ = 0;
+
+  for (size_t i = 0; i < old_capacity; ++i) {
+    if (old_ctrl[i] != kEmpty && old_ctrl[i] != kTombstone) {
+      insertInternal(old_keys[i], old_idxs[i]);
+    }
+  }
+}
+
+OrderIndexMap::InsertResult OrderIndexMap::insert(uint64_t key, uint32_t idx) {
+  if ((size_ + tombstones_ + 1) * 10 >= capacity_ * 7) {
+    rehash(capacity_ * 2);
+  }
+  return insertInternal(key, idx);
+}
+
+OrderIndexMap::InsertResult OrderIndexMap::insertInternal(uint64_t key, uint32_t idx) {
+  const size_t mask = capacity_ - 1;
+  const size_t hash = hashKey(key);
+  const uint8_t h2 = static_cast<uint8_t>((hash >> 7) & 0x7F);
+  size_t index = hash & mask;
+  size_t first_tombstone = capacity_;
+
+  for (size_t probe = 0; probe < capacity_; probe += kGroupSize) {
+    size_t group_start = index & mask;
+    for (size_t i = 0; i < kGroupSize; ++i) {
+      size_t slot = (group_start + i) & mask;
+      uint8_t ctrl = ctrl_[slot];
+      if (ctrl == kEmpty) {
+        size_t target = (first_tombstone != capacity_) ? first_tombstone : slot;
+        ctrl_[target] = h2;
+        keys_[target] = key;
+        idxs_[target] = idx;
+        ++size_;
+        if (first_tombstone != capacity_) {
+          --tombstones_;
+        }
+        return InsertResult::kInserted;
+      }
+      if (ctrl == kTombstone) {
+        if (first_tombstone == capacity_) {
+          first_tombstone = slot;
+        }
+        continue;
+      }
+      if (ctrl == h2 && keys_[slot] == key) {
+        return InsertResult::kExists;
+      }
+    }
+    index = (group_start + kGroupSize) & mask;
+  }
+  return InsertResult::kFailed;
+}
+
+bool OrderIndexMap::erase(uint64_t key) {
+  if (capacity_ == 0) return false;
+  const size_t mask = capacity_ - 1;
+  const size_t hash = hashKey(key);
+  const uint8_t h2 = static_cast<uint8_t>((hash >> 7) & 0x7F);
+  size_t index = hash & mask;
+
+  for (size_t probe = 0; probe < capacity_; probe += kGroupSize) {
+    size_t group_start = index & mask;
+    for (size_t i = 0; i < kGroupSize; ++i) {
+      size_t slot = (group_start + i) & mask;
+      uint8_t ctrl = ctrl_[slot];
+      if (ctrl == kEmpty) {
+        return false;
+      }
+      if (ctrl == h2 && keys_[slot] == key) {
+        ctrl_[slot] = kTombstone;
+        --size_;
+        ++tombstones_;
+        if (tombstones_ * 4 > capacity_) {
+          rehash(capacity_);
+        }
+        return true;
+      }
+    }
+    index = (group_start + kGroupSize) & mask;
+  }
+  return false;
+}
+
+Order* OrderArena::allocate(uint64_t order_id, int32_t price, uint32_t qty, Side side, uint32_t* out_idx) {
+  if (free_list_.empty()) {
+    if (!addChunk()) return nullptr;
+  }
+  uint32_t idx = free_list_.back();
+  free_list_.pop_back();
+  if (out_idx) {
+    *out_idx = idx;
+  }
+  Order* order = get(idx);
+  order->order_id = order_id;
+  order->price = price;
+  order->qty = qty;
+  order->side = side;
+  order->level = nullptr;
+  order->prev = order;
+  order->next = order;
+  return order;
+}
+
+void OrderArena::deallocate(uint32_t idx) {
+  free_list_.push_back(idx);
+}
+
+Order* OrderArena::get(uint32_t idx) const {
+  uint32_t chunk_id = idx >> kChunkShift;
+  uint32_t offset = idx & kChunkMask;
+  return chunks_[chunk_id].get() + offset;
+}
+
+void OrderArena::clear() {
+  free_list_.clear();
+  free_list_.reserve(chunks_.size() * kChunkSize);
+  for (size_t chunk_id = 0; chunk_id < chunks_.size(); ++chunk_id) {
+    uint32_t base = static_cast<uint32_t>(chunk_id) << kChunkShift;
+    for (uint32_t offset = 0; offset < kChunkSize; ++offset) {
+      free_list_.push_back(base | offset);
+    }
+  }
+}
+
+bool OrderArena::addChunk() {
+  constexpr size_t kMaxChunks = (std::numeric_limits<uint32_t>::max() >> kChunkShift);
+  if (chunks_.size() >= kMaxChunks) {
+    return false;
+  }
+  std::unique_ptr<Order[]> chunk(new (std::nothrow) Order[kChunkSize]);
+  if (!chunk) {
+    return false;
+  }
+  chunks_.push_back(std::move(chunk));
+
+  uint32_t chunk_id = static_cast<uint32_t>(chunks_.size() - 1);
+  uint32_t base = chunk_id << kChunkShift;
+  free_list_.reserve(free_list_.size() + kChunkSize);
+  for (uint32_t offset = 0; offset < kChunkSize; ++offset) {
+    free_list_.push_back(base | offset);
+  }
+  return true;
+}
+
 OrderBook::OrderBook(const char* symbol) {
   std::strncpy(symbol_, symbol, SYMBOL_LEN - 1);
   symbol_[SYMBOL_LEN - 1] = '\0';
-  order_map_.fill(nullptr);
+  order_map_.clear();
   price_level_map_.fill(nullptr);
   bbo_ = {};
   order_count_ = 0;
   price_level_count_ = 0;
 
-  // 16 cold tiers allows up to ~1M orders (65536 * 17)
-  order_pool_ = new TieredMemoryPool<Order, MAX_ORDERS>(16);
   // 8 cold tiers allows up to ~18K price levels (2048 * 9)
   level_pool_ = new TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>(8);
 }
@@ -184,7 +316,6 @@ OrderBook::OrderBook(const char* symbol) {
 OrderBook::~OrderBook() {
   clear();
 
-  delete order_pool_;
   delete level_pool_;
 }
 
@@ -337,12 +468,8 @@ void OrderBook::updateBBOSide(bool update_bid, bool update_ask) {
 }
 
 void OrderBook::clear() {
-  for (Order* order : order_map_) {
-    if (order && !isDeleted(order)) {
-      order_pool_->deallocate(order);
-    }
-  }
-  order_map_.fill(nullptr);
+  order_map_.clear();
+  order_arena_.clear();
   order_count_ = 0;
 
   price_level_map_.fill(nullptr);
@@ -382,77 +509,13 @@ void OrderBook::clear() {
 }
 
 void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
-  // Use Robin Hood hashing with backward-shift deletion compatibility.
-  const size_t mask = MAX_ORDERS - 1;
-  const size_t start_index = orderHash(order_id);
-
-  // Early exit: order already exists (unlikely for new orders)
-  if (unlikely(findOrderIndex(order_map_, order_id) != MAX_ORDERS)) {
+  uint32_t idx = 0;
+  Order* new_order = order_arena_.allocate(order_id, price, qty, side, &idx);
+  if (unlikely(!new_order)) return;
+  OrderIndexMap::InsertResult insert_result = order_map_.insert(order_id, idx);
+  if (unlikely(insert_result != OrderIndexMap::InsertResult::kInserted)) {
+    order_arena_.deallocate(idx);
     return;
-  }
-  // Early exit: hash table is full
-  if (unlikely(order_count_ >= MAX_ORDERS)) {
-    return;
-  }
-
-  // Create new order from pool (likely to succeed in most cases)
-  Order* new_order = order_pool_->allocate(order_id, price, qty, side);
-  if (unlikely(!new_order)) return;  // Pool exhausted
-
-  // Optimized Robin Hood insertion with loop unrolling
-  Order* to_insert = new_order;
-  size_t index = start_index;
-  size_t probe = 0;
-  size_t first_deleted = MAX_ORDERS;
-
-  while (true) {
-    Order* current = order_map_[index];
-
-    // Fast path: empty slot found
-    if (likely(current == nullptr)) {
-      if (first_deleted != MAX_ORDERS) {
-        order_map_[first_deleted] = to_insert;
-      } else {
-        order_map_[index] = to_insert;
-      }
-      break;
-    }
-
-    if (unlikely(isDeleted(current))) {
-      if (first_deleted == MAX_ORDERS) {
-        first_deleted = index;
-      }
-      index = (index + 1) & mask;
-      ++probe;
-      if (unlikely(index == start_index)) {
-        if (first_deleted != MAX_ORDERS) {
-          order_map_[first_deleted] = to_insert;
-          break;
-        }
-        return;
-      }
-      continue;
-    }
-
-    // Robin Hood swap: give our slot to someone with shorter probe distance
-    size_t existing_home = static_cast<size_t>(current->order_id) & mask;
-    size_t existing_probe = (index - existing_home) & mask;
-
-    if (existing_probe < probe) {
-      // Swap and continue with the displaced entry
-      std::swap(order_map_[index], to_insert);
-      probe = existing_probe;
-    }
-
-    index = (index + 1) & mask;
-    ++probe;
-    if (unlikely(index == start_index)) {
-      if (first_deleted != MAX_ORDERS) {
-        order_map_[first_deleted] = to_insert;
-        break;
-      }
-      return;
-    }
   }
 
   // Determine BBO update flags using branchless comparison
@@ -475,21 +538,15 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
     level = level_pool_->allocate(price, side, new_order);
     if (unlikely(!level)) {
       // Rollback on allocation failure
-      order_pool_->deallocate(new_order);
-      size_t remove_idx = findOrderIndex(order_map_, order_id);
-      if (remove_idx != MAX_ORDERS) {
-        order_map_[remove_idx] = kDeletedSentinel;
-      }
+      order_map_.erase(order_id);
+      order_arena_.deallocate(idx);
       return;
     }
     if (unlikely(!addPriceLevel(level))) {
       // Rollback on add failure
       level_pool_->deallocate(level);
-      order_pool_->deallocate(new_order);
-      size_t remove_idx = findOrderIndex(order_map_, order_id);
-      if (remove_idx != MAX_ORDERS) {
-        order_map_[remove_idx] = kDeletedSentinel;
-      }
+      order_map_.erase(order_id);
+      order_arena_.deallocate(idx);
       return;
     }
   } else {
@@ -510,12 +567,11 @@ void OrderBook::addOrder(uint64_t order_id, int32_t price, uint32_t qty, Side si
 }
 
 void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side side) {
-  const size_t index = findOrderIndex(order_map_, order_id);
-  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
-
-  if (unlikely(!order)) {
+  uint32_t idx = 0;
+  if (unlikely(!order_map_.find(order_id, &idx))) {
     return;  // Order not found
   }
+  Order* order = order_arena_.get(idx);
 
   // Check if BBO needs updating
   bool update_bid = false;
@@ -557,12 +613,11 @@ void OrderBook::modifyOrder(uint64_t order_id, int32_t price, uint32_t qty, Side
 
 // Delete an order
 void OrderBook::deleteOrder(uint64_t order_id, Side side) {
-  const size_t index = findOrderIndex(order_map_, order_id);
-  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
-
-  if (unlikely(!order)) {
+  uint32_t idx = 0;
+  if (unlikely(!order_map_.find(order_id, &idx))) {
     return;  // Order not found
   }
+  Order* order = order_arena_.get(idx);
 
   // Check if BBO needs updating (deleting from BBO level)
   bool update_bid = false;
@@ -599,8 +654,8 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
   }
 
   // Remove from order map and deallocate
-  order_map_[index] = kDeletedSentinel;
-  order_pool_->deallocate(order);
+  order_map_.erase(order_id);
+  order_arena_.deallocate(idx);
   if (order_count_ > 0) {
     --order_count_;
   }
@@ -610,12 +665,11 @@ void OrderBook::deleteOrder(uint64_t order_id, Side side) {
 
 void OrderBook::processTrade(uint64_t order_id, uint64_t /*trade_id*/, int32_t price,
                              uint64_t qty, Side side, uint64_t timestamp) {
-  const size_t index = findOrderIndex(order_map_, order_id);
-  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
-
-  if (unlikely(!order)) {
+  uint32_t idx = 0;
+  if (unlikely(!order_map_.find(order_id, &idx))) {
     return;  // Order not found
   }
+  Order* order = order_arena_.get(idx);
 
   // Record trade for time window statistics
   window_stats_.recordTrade(timestamp, price, qty);
@@ -795,12 +849,11 @@ double OrderBook::getBookPressure(size_t k) const {
 }
 
 size_t OrderBook::getOrderRank(uint64_t order_id) const {
-  size_t index = findOrderIndex(order_map_, order_id);
-  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
-
-  if (!order) {
+  uint32_t idx = 0;
+  if (!order_map_.find(order_id, &idx)) {
     return 0;
   }
+  Order* order = order_arena_.get(idx);
 
   size_t rank = 1;
   Order* current = order->prev;
@@ -814,12 +867,11 @@ size_t OrderBook::getOrderRank(uint64_t order_id) const {
 
 // Get quantity ahead in queue
 uint32_t OrderBook::getQtyAhead(uint64_t order_id) const {
-  size_t index = findOrderIndex(order_map_, order_id);
-  Order* order = (index != MAX_ORDERS) ? order_map_[index] : nullptr;
-
-  if (!order) {
+  uint32_t idx = 0;
+  if (!order_map_.find(order_id, &idx)) {
     return 0;
   }
+  Order* order = order_arena_.get(idx);
 
   uint32_t qty_ahead = 0;
   Order* current = order->prev;

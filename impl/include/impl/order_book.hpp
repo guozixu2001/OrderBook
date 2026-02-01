@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <cstring>
 #include <climits>
+#include <memory>
+#include <new>
+#include <vector>
 
 #include "impl/memory_pool.hpp"
 #include "impl/tiered_memory_pool.hpp"
@@ -20,9 +23,8 @@ struct PriceLevel;
 constexpr size_t MAX_PRICE_LEVELS = 2048;  // Maximum number of price levels
 constexpr size_t MAX_ORDERS = 65536;       // Maximum number of orders
 constexpr size_t SYMBOL_LEN = 16;          // Symbol length
+constexpr size_t ORDER_MAP_INITIAL_CAPACITY = MAX_ORDERS;
 
-// Hash map type aliases (actual alignment handled by OrderBook members)
-using OrderHashMap = std::array<Order*, MAX_ORDERS>;
 using PriceLevelHashMap = std::array<PriceLevel*, MAX_PRICE_LEVELS>;
 
 enum class Side : uint8_t {
@@ -92,6 +94,60 @@ struct PriceLevel {
   }
 };
 
+class OrderIndexMap {
+public:
+  enum class InsertResult : uint8_t {
+    kInserted = 0,
+    kExists = 1,
+    kFailed = 2,
+  };
+
+  explicit OrderIndexMap(size_t initial_capacity = MAX_ORDERS);
+  void clear();
+  bool find(uint64_t key, uint32_t* idx_out) const;
+  InsertResult insert(uint64_t key, uint32_t idx);
+  bool erase(uint64_t key);
+  size_t size() const { return size_; }
+
+private:
+  static constexpr uint8_t kEmpty = 0x80;
+  static constexpr uint8_t kTombstone = 0xFE;
+  static constexpr size_t kGroupSize = 16;
+  static constexpr size_t kMinCapacity = 16;
+
+  static size_t nextPow2(size_t value);
+  void rehash(size_t new_capacity);
+  InsertResult insertInternal(uint64_t key, uint32_t idx);
+
+  std::vector<uint8_t> ctrl_;
+  std::vector<uint64_t> keys_;
+  std::vector<uint32_t> idxs_;
+  size_t capacity_ = 0;
+  size_t size_ = 0;
+  size_t tombstones_ = 0;
+};
+
+class OrderArena {
+public:
+  static constexpr uint32_t kChunkShift = 16;
+  static constexpr uint32_t kChunkSize = 1u << kChunkShift;
+  static constexpr uint32_t kChunkMask = kChunkSize - 1;
+
+  OrderArena() = default;
+  ~OrderArena() = default;
+
+  Order* allocate(uint64_t order_id, int32_t price, uint32_t qty, Side side, uint32_t* out_idx);
+  void deallocate(uint32_t idx);
+  Order* get(uint32_t idx) const;
+  void clear();
+
+private:
+  bool addChunk();
+
+  std::vector<std::unique_ptr<Order[]>> chunks_;
+  std::vector<uint32_t> free_list_;
+};
+
 class OrderBook {
 private:
   char symbol_[SYMBOL_LEN];
@@ -99,11 +155,11 @@ private:
   // Tiered memory pools for scalable capacity
   // L0 (hot tier) handles normal load, L1+ (cold tiers) handle overflow
   // All tiers pre-allocated at construction - no heap allocation on hot path
-  TieredMemoryPool<Order, MAX_ORDERS>* order_pool_ = nullptr;
   TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
 
   // Order tracking: order_id -> Order* (cache line aligned to prevent false sharing)
-  alignas(64) OrderHashMap order_map_;
+  OrderArena order_arena_;
+  OrderIndexMap order_map_{ORDER_MAP_INITIAL_CAPACITY};
 
   // Price level tracking: price -> PriceLevel* (cache line aligned to prevent false sharing)
   alignas(64) PriceLevelHashMap price_level_map_;
@@ -140,12 +196,9 @@ private:
 public:
   explicit OrderBook(const char* symbol);
   OrderBook() : symbol_{""} {
-    order_map_.fill(nullptr);
     price_level_map_.fill(nullptr);
     bbo_ = {};
 
-    // 16 cold tiers allows up to ~1M orders (65536 * 17)
-    order_pool_ = new TieredMemoryPool<Order, MAX_ORDERS>(16);
     // 8 cold tiers allows up to ~18K price levels (2048 * 9)
     level_pool_ = new TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>(8);
   }

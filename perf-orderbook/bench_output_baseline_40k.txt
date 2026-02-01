@@ -1,0 +1,7 @@
+-------------------------------------------------------------------------------------------------------------
+Benchmark                                                   Time             CPU   Iterations UserCounters...
+-------------------------------------------------------------------------------------------------------------
+BM_OrderBookWorkload/ops:50000/trade_pct:10_mean    773109425 ns    773041907 ns            5 items_per_second=64.6872k/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10_median  779355799 ns    779317475 ns            5 items_per_second=64.1587k/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10_stddev    9400214 ns      9393640 ns            5 items_per_second=789.502/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10_cv           1.22 %          1.22 %             5 items_per_second=1.22%

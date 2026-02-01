@@ -3,7 +3,7 @@
 ## 测试环境
 
 ```
-Date: 2026-02-01T13:18:46Z
+Date: 2026-02-01T13:17:51Z
 Linux sharp-game-fades-fin-03 6.8.0-90-generic #91-Ubuntu SMP PREEMPT_DYNAMIC Tue Nov 18 14:14:30 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
 ---- lscpu ----
 Architecture:                         x86_64
@@ -51,8 +51,8 @@ Vulnerability Tsx async abort:        Not affected
 Vulnerability Vmscape:                Not affected
 ---- meminfo ----
 MemTotal:       187511724 kB
-MemFree:        66620856 kB
-MemAvailable:   179167872 kB
+MemFree:        66881984 kB
+MemAvailable:   179428972 kB
 ```
 
 ## 工作负载
@@ -67,27 +67,27 @@ MemAvailable:   179167872 kB
 -------------------------------------------------------------------------------------------------------------
 Benchmark                                                   Time             CPU   Iterations UserCounters...
 -------------------------------------------------------------------------------------------------------------
-BM_OrderBookWorkload/ops:50000/trade_pct:10_mean      2089996 ns      2089754 ns            5 items_per_second=23.9263M/s
-BM_OrderBookWorkload/ops:50000/trade_pct:10_median    2089664 ns      2089452 ns            5 items_per_second=23.9297M/s
-BM_OrderBookWorkload/ops:50000/trade_pct:10_stddev       1607 ns         1583 ns            5 items_per_second=18.1263k/s
-BM_OrderBookWorkload/ops:50000/trade_pct:10_cv           0.08 %          0.08 %             5 items_per_second=0.08%
+BM_OrderBookWorkload/ops:50000/trade_pct:10_mean    767994237 ns    767938966 ns            5 items_per_second=65.1096k/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10_median  768685395 ns    768659640 ns            5 items_per_second=65.0483k/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10_stddev    1777977 ns      1766781 ns            5 items_per_second=149.867/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10_cv           0.23 %          0.23 %             5 items_per_second=0.23%
 ```
 
 ## 性能指标表
 
 | 指标 | 值 | 说明 |
 |---|---:|---|
-| Instructions | 65242679333.0 | retired instructions |
-| Cycles | 58373722759.0 | CPU cycles |
-| IPC | 1.118 | instructions per cycle |
-| CPI | 0.895 | cycles per instruction |
-| Branch miss rate | 1.486% | branch-misses / branches |
-| Cache miss rate | 6.984% | cache-misses / cache-references |
-| L1D MPKI | 81.32 | L1-dcache-load-misses per 1K instr |
-| L1I MPKI | 0.037 | L1-icache-load-misses per 1K instr |
+| Instructions | 80525290242.0 | retired instructions |
+| Cycles | 25114086436.0 | CPU cycles |
+| IPC | 3.206 | instructions per cycle |
+| CPI | 0.312 | cycles per instruction |
+| Branch miss rate | 0.214% | branch-misses / branches |
+| Cache miss rate | 11.81% | cache-misses / cache-references |
+| L1D MPKI | 86.76 | L1-dcache-load-misses per 1K instr |
+| L1I MPKI | 0.018 | L1-icache-load-misses per 1K instr |
 | LLC MPKI | N/A | LLC-load-misses per 1K instr |
-| dTLB MPKI | 0.021 | dTLB-load-misses per 1K instr |
-| iTLB MPKI | 0.001 | iTLB-load-misses per 1K instr |
+| dTLB MPKI | 0.020 | dTLB-load-misses per 1K instr |
+| iTLB MPKI | 0.000 | iTLB-load-misses per 1K instr |
 
 ## 结论（草稿）
 
