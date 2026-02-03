@@ -125,6 +125,8 @@ private:
 
   std::vector<std::unique_ptr<Order[]>> chunks_;
   std::vector<size_t> free_list_;
+  size_t next_index_ = 0;
+  size_t capacity_ = 0;
 };
 
 class PriceLevelStore {

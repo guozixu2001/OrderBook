@@ -171,11 +171,16 @@ bool OrderIndexMap::erase(uint64_t key) {
 }
 
 Order* OrderArena::allocate(uint64_t order_id, int32_t price, uint32_t qty, Side side, size_t* out_idx) {
-  if (free_list_.empty()) {
-    if (!addChunk()) return nullptr;
+  size_t idx = 0;
+  if (!free_list_.empty()) {
+    idx = free_list_.back();
+    free_list_.pop_back();
+  } else {
+    if (next_index_ >= capacity_) {
+      if (!addChunk()) return nullptr;
+    }
+    idx = next_index_++;
   }
-  size_t idx = free_list_.back();
-  free_list_.pop_back();
   if (out_idx) {
     *out_idx = idx;
   }
@@ -202,13 +207,7 @@ Order* OrderArena::get(size_t idx) const {
 
 void OrderArena::clear() {
   free_list_.clear();
-  free_list_.reserve(chunks_.size() * kChunkSize);
-  for (size_t chunk_id = 0; chunk_id < chunks_.size(); ++chunk_id) {
-    size_t base = chunk_id << kChunkShift;
-    for (size_t offset = 0; offset < kChunkSize; ++offset) {
-      free_list_.push_back(base | offset);
-    }
-  }
+  next_index_ = 0;
 }
 
 bool OrderArena::addChunk() {
@@ -221,13 +220,7 @@ bool OrderArena::addChunk() {
     return false;
   }
   chunks_.push_back(std::move(chunk));
-
-  size_t chunk_id = chunks_.size() - 1;
-  size_t base = chunk_id << kChunkShift;
-  free_list_.reserve(free_list_.size() + kChunkSize);
-  for (size_t offset = 0; offset < kChunkSize; ++offset) {
-    free_list_.push_back(base | offset);
-  }
+  capacity_ += kChunkSize;
   return true;
 }
 
