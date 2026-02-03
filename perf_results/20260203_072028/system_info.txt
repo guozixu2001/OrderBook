@@ -1,0 +1,24 @@
+=== System Information ===
+Date: Tue Feb  3 07:20:28 AM UTC 2026
+
+=== CPU Info ===
+Architecture:                         x86_64
+CPU(s):                               10
+Model name:                           Intel(R) Xeon(R) CPU E7-8880 v3 @ 2.30GHz
+Thread(s) per core:                   1
+Core(s) per socket:                   10
+
+=== Memory Info ===
+               total        used        free      shared  buff/cache   available
+Mem:            62Gi       2.1Gi        51Gi       1.1Mi         9Gi        60Gi
+Swap:          4.0Gi          0B       4.0Gi
+
+=== OS Info ===
+NAME="Ubuntu"
+VERSION="24.04.2 LTS (Noble Numbat)"
+
+=== Compiler Info ===
+g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+cmake version 3.28.3
+
+=== CPU Frequency Scaling ===

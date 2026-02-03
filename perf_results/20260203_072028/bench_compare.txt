@@ -1,0 +1,86 @@
+-----------------------------------------------------------------------------------------
+Benchmark                               Time             CPU   Iterations UserCounters...
+-----------------------------------------------------------------------------------------
+BM_Original_recordTrade/100          4635 ns         4599 ns       151954 items_per_second=21.7441M/s
+BM_Original_recordTrade/512         14194 ns        14194 ns        49337 items_per_second=36.0703M/s
+BM_Original_recordTrade/1000        26111 ns        26172 ns        26706 items_per_second=38.2095M/s
+BM_RingBuffer_recordTrade/100        4598 ns         4561 ns       153628 items_per_second=21.9262M/s
+BM_RingBuffer_recordTrade/512       20742 ns        20737 ns        33537 items_per_second=24.6904M/s
+BM_RingBuffer_recordTrade/1000      46699 ns        46717 ns        14956 items_per_second=21.4056M/s
+BM_Original_getPriceRange            5.64 ns         5.64 ns    124179231
+BM_RingBuffer_getPriceRange          3.61 ns         3.61 ns    193602196
+BM_Original_evictExpired           544769 ns       544842 ns         1280
+BM_RingBuffer_evictExpired          35630 ns        35375 ns        19774
+BM_Original_getVWAP                  11.0 ns         11.0 ns     63808013
+BM_RingBuffer_getVWAP                11.0 ns         11.0 ns     63516507
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+=== Correctness Test Results ===
+Original getPriceRange: 49
+RingBuffer getPriceRange: 49
+Original getVWAP: 124
+RingBuffer getVWAP: 124
+Ranges match: YES
+VWAPs match: YES
+Correctness_test                    0.540 ns        0.540 ns   1000000000

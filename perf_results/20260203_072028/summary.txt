@@ -1,0 +1,67 @@
+=== Performance Test Summary ===
+Date: Tue Feb  3 07:26:28 AM UTC 2026
+Test run: 20260203_072028
+Output directory: /home/zxguo/dev/bootcamp/perf_results/20260203_072028
+
+=== Git Info ===
+Commit: bd26be2
+Branch: main
+Message: optimize add_delete: use contiguous order
+
+=== Build Info ===
+Build type: Release
+Build time: 2s
+
+=== Test Data ===
+Data file: /bootcamp_demo/bootcamp_mkdata.20251010.mini
+Data size: 337M
+Data lines: 750404
+
+=== End-to-End Results ===
+Wall clock time: 0:16.48
+Max RSS: 322092 KB
+CPI: N/A
+Cache miss rate: N/A
+Branch miss rate: N/A
+L1-dcache miss rate: N/A
+
+=== Benchmark Results (selected) ===
+BM_HashMap_Modulo/1000                               390 ns          390 ns      1796141
+BM_HashMap_Modulo/4096                              1554 ns         1554 ns       446120
+BM_HashMap_Modulo/32768                            12344 ns        12343 ns        56744
+BM_HashMap_Modulo/100000                           37619 ns        37615 ns        18605
+BM_HashMap_Bitwise/1000                              387 ns          387 ns      1810293
+BM_HashMap_Bitwise/4096                             1552 ns         1552 ns       450921
+BM_HashMap_Bitwise/32768                           12338 ns        12337 ns        56759
+BM_HashMap_Bitwise/100000                          37617 ns        37613 ns        18604
+BM_PriceIndex_Modulo/1000                           1513 ns         1513 ns       461051
+BM_PriceIndex_Modulo/4096                           6185 ns         6184 ns       113525
+BM_PriceIndex_Modulo/32768                         49305 ns        49303 ns        14175
+BM_PriceIndex_Modulo/100000                       150842 ns       150823 ns         4653
+BM_PriceIndex_Bitwise/1000                          1507 ns         1507 ns       464646
+BM_PriceIndex_Bitwise/4096                          6159 ns         6158 ns       113733
+BM_PriceIndex_Bitwise/32768                        48661 ns        48658 ns        14373
+BM_PriceIndex_Bitwise/100000                      145244 ns       145227 ns         4815
+BM_RingBuffer_Modulo/1000                            709 ns          709 ns       985042
+BM_RingBuffer_Modulo/4096                           2900 ns         2900 ns       241375
+BM_RingBuffer_Modulo/32768                         22857 ns        22856 ns        30658
+BM_RingBuffer_Modulo/100000                        67593 ns        67588 ns        10339
+
+=== Generated Files ===
+total 33796
+drwxrwxr-x 2 zxguo zxguo     4096 Feb  3 07:26 .
+drwxrwxr-x 8 zxguo zxguo     4096 Feb  3 07:20 ..
+-rw-rw-r-- 1 zxguo zxguo     3100 Feb  3 07:25 bench_compare.txt
+-rw-rw-r-- 1 zxguo zxguo     1380 Feb  3 07:26 bench_loop_comparison.txt
+-rw-rw-r-- 1 zxguo zxguo    83447 Feb  3 07:24 benchmark.json
+-rw-rw-r-- 1 zxguo zxguo    19116 Feb  3 07:24 benchmark.txt
+-rw-rw-r-- 1 zxguo zxguo     1440 Feb  3 07:26 bench_prefetch_compare.txt
+-rw-rw-r-- 1 zxguo zxguo     1949 Feb  3 07:20 build.log
+-rw-r--r-- 1 zxguo zxguo 34438792 Feb  3 07:21 e2e_output.csv
+-rw-rw-r-- 1 zxguo zxguo     1477 Feb  3 07:21 e2e_perf.txt
+-rw-rw-r-- 1 zxguo zxguo      499 Feb  3 07:21 e2e_summary.txt
+-rw-rw-r-- 1 zxguo zxguo      916 Feb  3 07:20 e2e_time.txt
+-rw-rw-r-- 1 zxguo zxguo     1268 Feb  3 07:20 git_info.txt
+-rw-rw-r-- 1 zxguo zxguo     2526 Feb  3 07:26 perf_test.log
+-rw-rw-r-- 1 zxguo zxguo     2424 Feb  3 07:26 summary.txt
+-rw-rw-r-- 1 zxguo zxguo      743 Feb  3 07:20 system_info.txt

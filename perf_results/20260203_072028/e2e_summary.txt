@@ -1,0 +1,22 @@
+=== End-to-End Performance Summary ===
+Date: Tue Feb  3 07:21:03 AM UTC 2026
+Data file: /bootcamp_demo/bootcamp_mkdata.20251010.mini
+Grid file: /home/zxguo/dev/bootcamp/grids_full.txt
+Build type: Release
+
+Wall clock time: 0:16.48
+Max RSS: 322092 KB
+
+=== Hardware Counters ===
+Cycles: N/A
+Instructions: N/A
+CPI: N/A
+Cache references: N/A
+Cache misses: N/A
+Cache miss rate: N/A
+Branches: N/A
+Branch misses: N/A
+Branch miss rate: N/A
+L1-dcache loads: N/A
+L1-dcache misses: N/A
+L1-dcache miss rate: N/A

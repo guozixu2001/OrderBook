@@ -1,0 +1,20 @@
+-----------------------------------------------------------------------
+Benchmark                             Time             CPU   Iterations
+-----------------------------------------------------------------------
+BM_TraverseNoPrefetch/10           13.3 ns         13.3 ns     52433662
+BM_TraverseNoPrefetch/64            142 ns          142 ns      4937996
+BM_TraverseNoPrefetch/512          1369 ns         1369 ns       511212
+BM_TraverseNoPrefetch/2000         5500 ns         5499 ns       127267
+BM_TraverseWithPrefetch/10         14.9 ns         14.9 ns     46912122
+BM_TraverseWithPrefetch/64          167 ns          167 ns      4195925
+BM_TraverseWithPrefetch/512        1395 ns         1395 ns       501344
+BM_TraverseWithPrefetch/2000       5493 ns         5491 ns       127670
+BM_AddOrderMiddle/10/10          484775 ns       484721 ns         1513
+BM_AddOrderMiddle/64/10          482606 ns       482559 ns         1448
+BM_AddOrderMiddle/200/10         503005 ns       502963 ns         1000
+BM_AddOrderMiddle/10/64          478840 ns       478800 ns         1462
+BM_AddOrderMiddle/64/64          483502 ns       483443 ns         1443
+BM_AddOrderMiddle/200/64         515353 ns       515303 ns         1362
+BM_AddOrderMiddle/10/100         479676 ns       479636 ns         1455
+BM_AddOrderMiddle/64/100         488743 ns       488669 ns         1429
+BM_AddOrderMiddle/200/100        525833 ns       525777 ns         1307

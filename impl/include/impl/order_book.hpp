@@ -1,15 +1,14 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <cstring>
 #include <climits>
+#include <limits>
 #include <memory>
 #include <new>
 #include <vector>
 
-#include "impl/memory_pool.hpp"
-#include "impl/tiered_memory_pool.hpp"
+#include "impl/price_level_tree.hpp"
 #include "impl/sliding_window_ring.hpp"
 
 #define likely(x)   __builtin_expect(!!(x), 1)
@@ -20,12 +19,9 @@ namespace impl {
 struct Order;
 struct PriceLevel;
 
-constexpr size_t MAX_PRICE_LEVELS = 2048;  // Maximum number of price levels
-constexpr size_t MAX_ORDERS = 65536;       // Maximum number of orders
+constexpr size_t kOrderMapInitialCapacity = 1u << 16;  // Initial hint, not a limit
 constexpr size_t SYMBOL_LEN = 16;          // Symbol length
-constexpr size_t ORDER_MAP_INITIAL_CAPACITY = MAX_ORDERS;
-
-using PriceLevelHashMap = std::array<PriceLevel*, MAX_PRICE_LEVELS>;
+constexpr size_t INVALID_INDEX = std::numeric_limits<size_t>::max();
 
 enum class Side : uint8_t {
   BUY = 0,
@@ -44,13 +40,14 @@ struct Order {
   int32_t price = 0;
   uint32_t qty = 0;
   Side side = Side::BUY;
-  PriceLevel* level = nullptr;
+  size_t level_id = INVALID_INDEX;
 
-  Order* prev = nullptr;
-  Order* next = nullptr;
+  size_t prev_idx = INVALID_INDEX;
+  size_t next_idx = INVALID_INDEX;
 
   Order(uint64_t id, int32_t p, uint32_t q, Side s)
-    : order_id(id), price(p), qty(q), side(s), level(nullptr), prev(this), next(this) {}
+    : order_id(id), price(p), qty(q), side(s), level_id(INVALID_INDEX),
+      prev_idx(INVALID_INDEX), next_idx(INVALID_INDEX) {}
 
   Order() = default;
   Order(const Order&) = delete;
@@ -58,40 +55,22 @@ struct Order {
 };
 
 struct PriceLevel {
+  size_t id = INVALID_INDEX;
   int32_t price = 0;
   Side side = Side::BUY;
-  uint32_t total_qty = 0;     // Sum of all order quantities at this level
-  size_t order_count = 0;     // Number of orders at this level
+  uint32_t total_qty = 0;  // Sum of all order quantities at this level
+  size_t order_count = 0;  // Number of orders at this level
 
-  Order* first_order = nullptr;  // First order in the FIFO queue
+  size_t head_idx = INVALID_INDEX;  // First order in FIFO
+  size_t tail_idx = INVALID_INDEX;  // Last order in FIFO
 
-  // oubly linked list of price levels
-  PriceLevel* prev = nullptr;
-  PriceLevel* next = nullptr;
-
-  PriceLevel(int32_t p, Side s, Order* order)
-    : price(p), side(s), total_qty(order->qty), order_count(1), first_order(order) {
-    prev = this;
-    next = this;
-  }
+  PriceLevel(int32_t p, Side s, size_t order_idx, uint32_t qty, size_t level_id)
+    : id(level_id), price(p), side(s), total_qty(qty), order_count(1),
+      head_idx(order_idx), tail_idx(order_idx) {}
 
   PriceLevel() = default;
-  PriceLevel(const PriceLevel&) = delete;
-  PriceLevel& operator=(const PriceLevel&) = delete;
-
-  // Update total quantity based on all orders
-  void updateQty() {
-    total_qty = 0;
-    order_count = 0;
-    if (!first_order) return;
-
-    Order* current = first_order;
-    do {
-      total_qty += current->qty;
-      order_count++;
-      current = current->next;
-    } while (current != first_order);
-  }
+  PriceLevel(const PriceLevel&) = default;
+  PriceLevel& operator=(const PriceLevel&) = default;
 };
 
 class OrderIndexMap {
@@ -102,10 +81,10 @@ public:
     kFailed = 2,
   };
 
-  explicit OrderIndexMap(size_t initial_capacity = MAX_ORDERS);
+  explicit OrderIndexMap(size_t initial_capacity = kOrderMapInitialCapacity);
   void clear();
-  bool find(uint64_t key, uint32_t* idx_out) const;
-  InsertResult insert(uint64_t key, uint32_t idx);
+  bool find(uint64_t key, size_t* idx_out) const;
+  InsertResult insert(uint64_t key, size_t idx);
   bool erase(uint64_t key);
   size_t size() const { return size_; }
 
@@ -117,11 +96,11 @@ private:
 
   static size_t nextPow2(size_t value);
   void rehash(size_t new_capacity);
-  InsertResult insertInternal(uint64_t key, uint32_t idx);
+  InsertResult insertInternal(uint64_t key, size_t idx);
 
   std::vector<uint8_t> ctrl_;
   std::vector<uint64_t> keys_;
-  std::vector<uint32_t> idxs_;
+  std::vector<size_t> idxs_;
   size_t capacity_ = 0;
   size_t size_ = 0;
   size_t tombstones_ = 0;
@@ -129,78 +108,69 @@ private:
 
 class OrderArena {
 public:
-  static constexpr uint32_t kChunkShift = 16;
-  static constexpr uint32_t kChunkSize = 1u << kChunkShift;
-  static constexpr uint32_t kChunkMask = kChunkSize - 1;
+  static constexpr size_t kChunkShift = 16;
+  static constexpr size_t kChunkSize = 1u << kChunkShift;
+  static constexpr size_t kChunkMask = kChunkSize - 1;
 
   OrderArena() = default;
   ~OrderArena() = default;
 
-  Order* allocate(uint64_t order_id, int32_t price, uint32_t qty, Side side, uint32_t* out_idx);
-  void deallocate(uint32_t idx);
-  Order* get(uint32_t idx) const;
+  Order* allocate(uint64_t order_id, int32_t price, uint32_t qty, Side side, size_t* out_idx);
+  void deallocate(size_t idx);
+  Order* get(size_t idx) const;
   void clear();
 
 private:
   bool addChunk();
 
   std::vector<std::unique_ptr<Order[]>> chunks_;
-  std::vector<uint32_t> free_list_;
+  std::vector<size_t> free_list_;
+};
+
+class PriceLevelStore {
+public:
+  using LevelId = size_t;
+
+  LevelId allocate(int32_t price, Side side, size_t order_idx, uint32_t qty);
+  void deallocate(LevelId id);
+  PriceLevel* get(LevelId id);
+  const PriceLevel* get(LevelId id) const;
+  void clear();
+
+private:
+  std::vector<PriceLevel> levels_;
+  std::vector<LevelId> free_list_;
 };
 
 class OrderBook {
 private:
   char symbol_[SYMBOL_LEN];
 
-  // Tiered memory pools for scalable capacity
-  // L0 (hot tier) handles normal load, L1+ (cold tiers) handle overflow
-  // All tiers pre-allocated at construction - no heap allocation on hot path
-  TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>* level_pool_ = nullptr;
-
-  // Order tracking: order_id -> Order* (cache line aligned to prevent false sharing)
   OrderArena order_arena_;
-  OrderIndexMap order_map_{ORDER_MAP_INITIAL_CAPACITY};
+  OrderIndexMap order_map_{kOrderMapInitialCapacity};
 
-  // Price level tracking: price -> PriceLevel* (cache line aligned to prevent false sharing)
-  alignas(64) PriceLevelHashMap price_level_map_;
+  PriceLevelStore level_store_;
+  PriceLevelTree bid_tree_;
+  PriceLevelTree ask_tree_;
 
-  // Price levels: doubly linked lists sorted by price
-  PriceLevel* bids_ = nullptr;  // Best bid 
-  PriceLevel* asks_ = nullptr;  // Best ask 
-
-  // Best Bid/Offer cache
   BBO bbo_;
 
-  // Sliding window statistics for trade-based metrics (RingBuffer optimized)
   RingBufferSlidingWindowStats window_stats_;
 
-  // Occupancy counters to avoid full-table scans
   size_t order_count_ = 0;
-  size_t price_level_count_ = 0;
 
-  // Convert price to hash index
-  size_t priceToIndex(int32_t price) const;
+  PriceLevel* findPriceLevel(Side side, int32_t price);
+  const PriceLevel* findPriceLevel(Side side, int32_t price) const;
+  PriceLevel* addPriceLevel(Side side, int32_t price, size_t order_idx, uint32_t qty);
+  void removePriceLevel(Side side, int32_t price, size_t level_id);
 
-  // Add a price level to the book; returns false if the hash table is full
-  bool addPriceLevel(PriceLevel* level);
-
-  // Remove a price level from the book
-  void removePriceLevel(PriceLevel* level);
-
-  // Update BBO (full update)
   void updateBBO();
-
-  // Update BBO only for specific side when needed
   void updateBBOSide(bool update_bid, bool update_ask);
 
 public:
   explicit OrderBook(const char* symbol);
   OrderBook() : symbol_{""} {
-    price_level_map_.fill(nullptr);
     bbo_ = {};
-
-    // 8 cold tiers allows up to ~18K price levels (2048 * 9)
-    level_pool_ = new TieredMemoryPool<PriceLevel, MAX_PRICE_LEVELS>(8);
   }
   ~OrderBook();
 
@@ -218,12 +188,8 @@ public:
 
   // Query functions
   const BBO* getBBO() const { return &bbo_; }
-  // Find a price level by price (O(1) using hash map)
-  PriceLevel* findPriceLevel(int32_t price) const;
-  // Get number of price levels
   size_t getBidLevels() const;
   size_t getAskLevels() const;
-  // Get price and quantity at specific level
   int32_t getBidPrice(size_t level) const;
   uint32_t getBidQty(size_t level) const;
   int32_t getAskPrice(size_t level) const;
@@ -237,8 +203,8 @@ public:
   double getBookPressure(size_t k) const;
 
   // Order tracking
-  size_t getOrderRank(uint64_t order_id) const;  // 1-based rank
-  uint32_t getQtyAhead(uint64_t order_id) const; // Quantity ahead in queue
+  size_t getOrderRank(uint64_t order_id) const;
+  uint32_t getQtyAhead(uint64_t order_id) const;
 
   // Time window metrics (10 minutes)
   void evictExpiredTrades(uint64_t current_timestamp);

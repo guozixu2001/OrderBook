@@ -1,0 +1,52 @@
+=== Git Commit Information ===
+Date: Tue Feb  3 07:20:28 AM UTC 2026
+
+Commit SHA: bd26be271b7d8e994e2028668e3dd403c115ed2f
+Commit SHA (short): bd26be2
+Commit message: optimize add_delete: use contiguous order
+Commit author: Zixu Guo <guozixu2001@gmail.com>
+Commit date: 2026-02-01 13:30:52 +0000
+
+Branch: main
+Status: 30 uncommitted changes
+
+=== Uncommitted Changes ===
+?? .venv/
+?? 2025-12-15.log
+?? all_mkdata.txt
+?? bootcamp.md
+?? build.sh
+?? grids.txt
+?? grids_full.txt
+?? market_data_stat.txt
+?? mkdata.small
+?? output.csv
+?? perf-book-cn/
+?? perf_results/
+?? scripts/PROFILING.md
+?? scripts/analyze_market_data
+?? scripts/analyze_market_data.cpp
+?? scripts/demo_reader
+?? scripts/demo_reader.cpp
+?? scripts/flamegraph.sh
+?? scripts/generate_grids.py
+?? scripts/profile.sh
+?? scripts/run_perf_test.sh
+?? scripts/stats
+?? scripts/stats.cpp
+?? scripts/truncate_mkdata
+?? scripts/truncate_mkdata.cpp
+?? scripts/visualize_messages.py
+?? slides/
+?? tools/
+?? worklog/performance_optimization_20260115.md
+?? worklog/tiered_memory_pool_20260116.md
+
+=== Diff (short) ===
+
+=== Recent Commits ===
+bd26be2 optimize add_delete: use contiguous order
+bf9a798 fail to optimize add_delete
+58627a2 optimize add_delete
+32201e6 perf add/delete seperately
+95f6218 tune performance 1

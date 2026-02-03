@@ -1,0 +1,73 @@
+
+[0;34m========================================[0m
+[0;34m BootCamp Performance Test Suite[0m
+[0;34m========================================[0m
+
+[0;34m[INFO][0m Start time: Tue Feb  3 07:20:28 AM UTC 2026
+[0;34m[INFO][0m Output directory: /home/zxguo/dev/bootcamp/perf_results/20260203_072028
+[0;34m[INFO][0m Build type: Release
+
+[0;34m========================================[0m
+[0;34m Git Information[0m
+[0;34m========================================[0m
+
+
+[0;34m========================================[0m
+[0;34m System Information[0m
+[0;34m========================================[0m
+
+
+[0;34m========================================[0m
+[0;34m Building Project[0m
+[0;34m========================================[0m
+
+[0;34m[INFO][0m Running: ./build.sh  --no-demo
+[0;32m[SUCCESS][0m Build completed in 2s
+
+[0;34m========================================[0m
+[0;34m Build Artifacts[0m
+[0;34m========================================[0m
+
+[0;32m[SUCCESS][0m Main binary: /home/zxguo/dev/bootcamp/build/bootcamp
+[0;34m[INFO][0m Available benchmark executables:
+[0;34m[INFO][0m   - bench_compare
+[0;34m[INFO][0m   - bench_loop_comparison
+[0;34m[INFO][0m   - bench_loop_optimization
+[0;34m[INFO][0m   - benchmarks
+[0;34m[INFO][0m   - bench_prefetch
+[0;34m[INFO][0m   - bench_prefetch_compare
+
+[0;34m========================================[0m
+[0;34m Test Data Verification[0m
+[0;34m========================================[0m
+
+[0;34m[INFO][0m Data file: /bootcamp_demo/bootcamp_mkdata.20251010.mini
+[0;34m[INFO][0m Data size: 337M
+[0;34m[INFO][0m Data lines: 750404
+[0;34m[INFO][0m Grid file: /home/zxguo/dev/bootcamp/grids_full.txt
+
+[0;34m========================================[0m
+[0;34m End-to-End Performance Test[0m
+[0;34m========================================[0m
+
+[0;34m[INFO][0m Running end-to-end test with /usr/bin/time...
+[0;34m[INFO][0m Running end-to-end test with perf stat...
+[0;32m[SUCCESS][0m End-to-end test complete
+
+[0;34m========================================[0m
+[0;34m Micro-Benchmarks[0m
+[0;34m========================================[0m
+
+[0;34m[INFO][0m Running Google Benchmark suite...
+[0;34m[INFO][0m Running: bench_compare
+[0;34m[INFO][0m Running: bench_loop_comparison
+[0;34m[INFO][0m Running: bench_prefetch_compare
+[0;32m[SUCCESS][0m Micro-benchmarks complete
+
+[0;34m========================================[0m
+[0;34m Performance Test Summary[0m
+[0;34m========================================[0m
+
+[0;32m[SUCCESS][0m Performance test suite complete!
+[0;34m[INFO][0m Results saved to: /home/zxguo/dev/bootcamp/perf_results/20260203_072028
+[0;34m[INFO][0m Summary: /home/zxguo/dev/bootcamp/perf_results/20260203_072028/summary.txt

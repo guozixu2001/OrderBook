@@ -1,0 +1,20 @@
+--------------------------------------------------------------------
+Benchmark                          Time             CPU   Iterations
+--------------------------------------------------------------------
+BM_OldLoop/10                   7.02 ns         7.02 ns    101933602
+BM_OldLoop/64                    105 ns          105 ns      6555598
+BM_OldLoop/500                   796 ns          796 ns       878084
+BM_OldLoopManual/10             66.7 ns         66.7 ns     10505124
+BM_OldLoopManual/64             2590 ns         2590 ns       270149
+BM_OldLoopManual/500          186219 ns       186200 ns         3761
+BM_OldLoopInline/10             12.0 ns         12.0 ns     58268647
+BM_OldLoopInline/64              128 ns          128 ns      5455876
+BM_OldLoopInline/512            1337 ns         1337 ns       523394
+BM_OldLoopInline/1000           2645 ns         2645 ns       264589
+BM_NewLoopInline/10             11.2 ns         11.2 ns     62247619
+BM_NewLoopInline/64              125 ns          125 ns      5385924
+BM_NewLoopInline/512            1356 ns         1356 ns       515291
+BM_NewLoopInline/1000           2678 ns         2678 ns       261531
+BM_GetLevelsOptimized/10        12.2 ns         12.2 ns     57109373
+BM_GetLevelsOptimized/64         214 ns          214 ns      3264361
+BM_GetLevelsOptimized/500       3239 ns         3239 ns       215998

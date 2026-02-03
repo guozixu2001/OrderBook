@@ -356,43 +356,6 @@ TEST_F(OrderBookTest, OrderRankAfterDeletion) {
     EXPECT_EQ(ob->getQtyAhead(3), 10);
 }
 
-TEST_F(OrderBookTest, DeleteWithLinearProbingCollisions) {
-    uint64_t id1 = 1;
-    uint64_t id2 = id1 + MAX_ORDERS;
-    uint64_t id3 = id1 + 2 * MAX_ORDERS;
-
-    ob->addOrder(id1, 100, 10, Side::BUY);
-    ob->addOrder(id2, 100, 20, Side::BUY);
-    ob->addOrder(id3, 100, 30, Side::BUY);
-
-    EXPECT_EQ(ob->getBidQty(0), 60);
-
-    ob->deleteOrder(id1, Side::BUY);
-    EXPECT_EQ(ob->getBidQty(0), 50);
-
-    ob->deleteOrder(id2, Side::BUY);
-    EXPECT_EQ(ob->getBidQty(0), 30);
-}
-
-TEST_F(OrderBookTest, PriceLevelHashCollisions) {
-    int32_t p1 = 100;
-    int32_t p2 = p1 + static_cast<int32_t>(MAX_PRICE_LEVELS);
-
-    ob->addOrder(1, p1, 10, Side::BUY);
-    ob->addOrder(2, p2, 20, Side::BUY);
-
-    EXPECT_EQ(ob->getBidLevels(), 2);
-    EXPECT_EQ(ob->getBidPrice(0), p2);
-    EXPECT_EQ(ob->getBidQty(0), 20);
-    EXPECT_EQ(ob->getBidPrice(1), p1);
-    EXPECT_EQ(ob->getBidQty(1), 10);
-
-    ob->deleteOrder(2, Side::BUY);
-    EXPECT_EQ(ob->getBidLevels(), 1);
-    EXPECT_EQ(ob->getBidPrice(0), p1);
-    EXPECT_EQ(ob->getBidQty(0), 10);
-}
-
 // ==========================================
 // ==========================================
 

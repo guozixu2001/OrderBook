@@ -1,0 +1,22 @@
+
+ Performance counter stats for '/home/zxguo/dev/bootcamp/build/bootcamp /bootcamp_demo/bootcamp_mkdata.20251010.mini /home/zxguo/dev/bootcamp/perf_results/20260203_072028/e2e_output.csv /home/zxguo/dev/bootcamp/grids_full.txt':
+
+   <not supported>      cycles                                                                
+   <not supported>      instructions                                                          
+   <not supported>      cache-references                                                      
+   <not supported>      cache-misses                                                          
+   <not supported>      branches                                                              
+   <not supported>      branch-misses                                                         
+   <not supported>      L1-dcache-loads                                                       
+   <not supported>      L1-dcache-load-misses                                                 
+   <not supported>      LLC-loads                                                             
+   <not supported>      LLC-load-misses                                                       
+   <not supported>      dTLB-loads                                                            
+   <not supported>      dTLB-load-misses                                                      
+
+      16.578026484 seconds time elapsed
+
+       8.095451000 seconds user
+       8.481186000 seconds sys
+
+

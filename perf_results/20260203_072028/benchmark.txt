@@ -1,0 +1,196 @@
+----------------------------------------------------------------------------------------
+Benchmark                                              Time             CPU   Iterations
+----------------------------------------------------------------------------------------
+BM_HashMap_Modulo/1000                               390 ns          390 ns      1796141
+BM_HashMap_Modulo/4096                              1554 ns         1554 ns       446120
+BM_HashMap_Modulo/32768                            12344 ns        12343 ns        56744
+BM_HashMap_Modulo/100000                           37619 ns        37615 ns        18605
+BM_HashMap_Bitwise/1000                              387 ns          387 ns      1810293
+BM_HashMap_Bitwise/4096                             1552 ns         1552 ns       450921
+BM_HashMap_Bitwise/32768                           12338 ns        12337 ns        56759
+BM_HashMap_Bitwise/100000                          37617 ns        37613 ns        18604
+BM_PriceIndex_Modulo/1000                           1513 ns         1513 ns       461051
+BM_PriceIndex_Modulo/4096                           6185 ns         6184 ns       113525
+BM_PriceIndex_Modulo/32768                         49305 ns        49303 ns        14175
+BM_PriceIndex_Modulo/100000                       150842 ns       150823 ns         4653
+BM_PriceIndex_Bitwise/1000                          1507 ns         1507 ns       464646
+BM_PriceIndex_Bitwise/4096                          6159 ns         6158 ns       113733
+BM_PriceIndex_Bitwise/32768                        48661 ns        48658 ns        14373
+BM_PriceIndex_Bitwise/100000                      145244 ns       145227 ns         4815
+BM_RingBuffer_Modulo/1000                            709 ns          709 ns       985042
+BM_RingBuffer_Modulo/4096                           2900 ns         2900 ns       241375
+BM_RingBuffer_Modulo/32768                         22857 ns        22856 ns        30658
+BM_RingBuffer_Modulo/100000                        67593 ns        67588 ns        10339
+BM_RingBuffer_Bitwise/1000                           710 ns          710 ns       987333
+BM_RingBuffer_Bitwise/4096                          2899 ns         2899 ns       241283
+BM_RingBuffer_Bitwise/32768                        22896 ns        22895 ns        30642
+BM_RingBuffer_Bitwise/100000                       67338 ns        67335 ns        10370
+BM_RingBuffer_Increment/1000                         753 ns          753 ns       929847
+BM_RingBuffer_Increment/4096                        3082 ns         3082 ns       227028
+BM_RingBuffer_Increment/32768                      24662 ns        24661 ns        28381
+BM_RingBuffer_Increment/100000                     75260 ns        75255 ns         9300
+BM_RingBuffer_Increment_Bitwise/1000                 753 ns          753 ns       929785
+BM_RingBuffer_Increment_Bitwise/4096                3086 ns         3085 ns       227024
+BM_RingBuffer_Increment_Bitwise/32768              24675 ns        24673 ns        28372
+BM_RingBuffer_Increment_Bitwise/100000             75299 ns        75293 ns         9302
+BM_FalseSharing_Unaligned/2/real_time             130079 ns        78283 ns         4928
+BM_FalseSharing_Unaligned/8/real_time             487902 ns       465746 ns         1432
+BM_FalseSharing_Unaligned/16/real_time           1089248 ns      1062732 ns          637
+BM_FalseSharing_Aligned/2/real_time               131212 ns        78502 ns         5020
+BM_FalseSharing_Aligned/8/real_time               489897 ns       476374 ns         1455
+BM_FalseSharing_Aligned/16/real_time             1087833 ns      1061144 ns          634
+BM_ArrayAccess_Contiguous/64                        6.01 ns         6.01 ns    115991417
+BM_ArrayAccess_Contiguous/512                       36.5 ns         36.5 ns     19166389
+BM_ArrayAccess_Contiguous/4096                       271 ns          271 ns      2580989
+BM_ArrayAccess_Contiguous/32768                     6005 ns         6005 ns       116578
+BM_ArrayAccess_Contiguous/65536                    14017 ns        14016 ns        49925
+BM_ArrayAccess_Strided/64                           18.8 ns         18.8 ns     36480249
+BM_ArrayAccess_Strided/512                           708 ns          708 ns       989118
+BM_ArrayAccess_Strided/4096                         6699 ns         6698 ns       104559
+BM_ArrayAccess_Strided/32768                       85886 ns        85878 ns         8124
+BM_ArrayAccess_Strided/65536                      172402 ns       172383 ns         4011
+BM_Structure_NoPadding/1000                          672 ns          672 ns       936005
+BM_Structure_NoPadding/4096                         2532 ns         2532 ns       271146
+BM_Structure_NoPadding/32768                       19778 ns        19777 ns        31376
+BM_Structure_NoPadding/100000                      61626 ns        61622 ns        11688
+BM_Structure_WithPadding/1000                       1644 ns         1644 ns       426163
+BM_Structure_WithPadding/4096                       6722 ns         6720 ns       104039
+BM_Structure_WithPadding/32768                     53747 ns        53732 ns        13041
+BM_Structure_WithPadding/100000                   163925 ns       163914 ns         4272
+BM_OrderMap_Sequential/1000                          671 ns          671 ns      1037623
+BM_OrderMap_Sequential/4096                         2721 ns         2720 ns       255846
+BM_OrderMap_Sequential/32768                       23268 ns        23262 ns        30131
+BM_OrderMap_Sequential/100000                      75166 ns        75148 ns         9315
+BM_OrderMap_Collisions/1000                          934 ns          934 ns       753618
+BM_OrderMap_Collisions/4096                         4068 ns         4068 ns       172040
+BM_OrderMap_Collisions/32768                       43648 ns        43644 ns        16020
+BM_OrderMap_Collisions/100000                     143344 ns       143329 ns         4885
+BM_OrderMap_MultiThreaded/2/real_time            3892831 ns       121576 ns          180
+BM_OrderMap_MultiThreaded/8/real_time            1496551 ns       484327 ns          458
+BM_OrderMap_MultiThreaded/16/real_time           1809189 ns      1120689 ns          397
+BM_FindPriceLevelHit/10                             23.7 ns         23.7 ns     29547412
+BM_FindPriceLevelHit/64                              152 ns          152 ns      4618471
+BM_FindPriceLevelHit/500                            1156 ns         1156 ns       605433
+BM_FindPriceLevelMiss/10                            33.5 ns         33.5 ns     20860645
+BM_FindPriceLevelMiss/64                             852 ns          852 ns       821833
+BM_FindPriceLevelMiss/500                         101055 ns       101050 ns         6928
+BM_FindPriceLevelMixed/10                           28.6 ns         28.6 ns     24472296
+BM_FindPriceLevelMixed/64                            313 ns          313 ns      2234875
+BM_FindPriceLevelMixed/500                         21553 ns        21551 ns        32478
+BM_AddOrder_Sequential/100                        839608 ns       841515 ns          830 items_per_second=118.833k/s
+BM_AddOrder_Sequential/512                        861545 ns       863459 ns          811 items_per_second=592.964k/s
+BM_AddOrder_Sequential/4096                      1050798 ns      1052824 ns          666 items_per_second=3.89049M/s
+BM_AddOrder_Sequential/10000                     1361074 ns      1362948 ns          513 items_per_second=7.33704M/s
+BM_AddOrder_Colliding/4                           826871 ns       828277 ns          842 items_per_second=4.8293k/s
+BM_AddOrder_Colliding/8                           827114 ns       828535 ns          843 items_per_second=9.6556k/s
+BM_AddOrder_Colliding/64                          832781 ns       834138 ns          837 items_per_second=76.7259k/s
+BM_AddOrder_Random/100                            835368 ns       837239 ns          830 items_per_second=119.44k/s
+BM_AddOrder_Random/512                            858503 ns       860443 ns          815 items_per_second=595.042k/s
+BM_AddOrder_Random/4096                          1032621 ns      1034503 ns          671 items_per_second=3.95939M/s
+BM_AddOrder_Random/10000                         1321164 ns      1323016 ns          527 items_per_second=7.55849M/s
+BM_ModifyOrder_Sequential/100                     530600 ns       530519 ns         1329 items_per_second=188.495k/s
+BM_ModifyOrder_Sequential/512                     539205 ns       539106 ns         1301 items_per_second=949.721k/s
+BM_ModifyOrder_Sequential/4096                    620702 ns       620837 ns         1125 items_per_second=6.59754M/s
+BM_ModifyOrder_Sequential/10000                   744889 ns       745182 ns          934 items_per_second=13.4195M/s
+BM_ModifyOrder_Colliding/4                        528509 ns       528534 ns         1321 items_per_second=7.5681k/s
+BM_ModifyOrder_Colliding/8                        532308 ns       532371 ns         1328 items_per_second=15.0271k/s
+BM_ModifyOrder_Colliding/32                       531553 ns       531620 ns         1321 items_per_second=60.1933k/s
+BM_DeleteOrder_Sequential/100                     534330 ns       534362 ns         1315 items_per_second=187.139k/s
+BM_DeleteOrder_Sequential/512                     545985 ns       545879 ns         1286 items_per_second=937.938k/s
+BM_DeleteOrder_Sequential/4096                    679648 ns       679783 ns         1032 items_per_second=6.02545M/s
+BM_DeleteOrder_Sequential/10000                   891996 ns       892440 ns          784 items_per_second=11.2052M/s
+BM_DeleteOrder_Colliding/4                        531057 ns       531080 ns         1312 items_per_second=7.53182k/s
+BM_DeleteOrder_Colliding/8                        530673 ns       530722 ns         1311 items_per_second=15.0738k/s
+BM_DeleteOrder_Colliding/32                       539461 ns       539493 ns         1311 items_per_second=59.315k/s
+BM_GetOrderRank_Sequential/100                    537161 ns       537081 ns         1320 items_per_second=186.192k/s
+BM_GetOrderRank_Sequential/512                    543757 ns       543653 ns         1284 items_per_second=941.778k/s
+BM_GetOrderRank_Sequential/4096                  1693959 ns      1694224 ns          414 items_per_second=2.41763M/s
+BM_GetOrderRank_Sequential/10000                18690769 ns     18688999 ns           37 items_per_second=535.074k/s
+BM_OldLoop/10                                       9.03 ns         9.03 ns     77540891
+BM_OldLoop/64                                        105 ns          105 ns      6636962
+BM_OldLoop/500                                       840 ns          840 ns       833930
+BM_OldLoopManual/10                                 60.1 ns         60.1 ns     11570825
+BM_OldLoopManual/64                                 2533 ns         2533 ns       276078
+BM_OldLoopManual/500                              187359 ns       187336 ns         3738
+BM_OldLoopInline/10                                 12.0 ns         12.0 ns     58304829
+BM_OldLoopInline/64                                  128 ns          128 ns      5153716
+BM_OldLoopInline/512                                1335 ns         1335 ns       523965
+BM_OldLoopInline/1000                               2643 ns         2643 ns       264988
+BM_NewLoopInline/10                                 11.3 ns         11.3 ns     62345074
+BM_NewLoopInline/64                                  124 ns          124 ns      5573987
+BM_NewLoopInline/512                                1373 ns         1373 ns       510222
+BM_NewLoopInline/1000                               2663 ns         2663 ns       263118
+BM_GetLevelsOptimized/10                            18.1 ns         18.1 ns     38749873
+BM_GetLevelsOptimized/64                             174 ns          174 ns      4117164
+BM_GetLevelsOptimized/500                           3278 ns         3278 ns       213732
+BM_OldLoopPattern/10                                10.1 ns         10.1 ns     69856612
+BM_OldLoopPattern/64                                50.7 ns         50.7 ns     13767242
+BM_OldLoopPattern/512                                220 ns          220 ns      3186649
+BM_OldLoopPattern/1000                               405 ns          405 ns      1725074
+BM_NewLoopPattern/10                               0.376 ns        0.376 ns   1000000000
+BM_NewLoopPattern/64                               0.377 ns        0.377 ns   1000000000
+BM_NewLoopPattern/512                              0.376 ns        0.376 ns   1000000000
+BM_NewLoopPattern/1000                             0.376 ns        0.376 ns   1000000000
+BM_OrderBookGetLevels/10                            18.0 ns         18.0 ns     38746082
+BM_OrderBookGetLevels/64                             167 ns          167 ns      4064690
+BM_OrderBookGetLevels/500                           3285 ns         3285 ns       213311
+BM_OrderBookGetImbalance/10/5                       12.5 ns         12.5 ns     55917961
+BM_OrderBookGetImbalance/64/5                       12.5 ns         12.5 ns     56161222
+BM_OrderBookGetImbalance/500/5                      12.5 ns         12.5 ns     56115213
+BM_OrderBookGetImbalance/10/8                       18.4 ns         18.4 ns     38009721
+BM_OrderBookGetImbalance/64/8                       18.4 ns         18.4 ns     38089702
+BM_OrderBookGetImbalance/500/8                      18.2 ns         18.2 ns     38432508
+BM_OrderBookGetImbalance/10/64                      22.0 ns         22.0 ns     31857493
+BM_OrderBookGetImbalance/64/64                       214 ns          214 ns      3269512
+BM_OrderBookGetImbalance/500/64                      192 ns          192 ns      3646046
+BM_OrderBookGetImbalance/10/100                     22.0 ns         22.0 ns     31823367
+BM_OrderBookGetImbalance/64/100                      217 ns          217 ns      3219030
+BM_OrderBookGetImbalance/500/100                     302 ns          302 ns      2317749
+BM_OrderBookGetBookPressure/10/5                    55.7 ns         55.7 ns     12580998
+BM_OrderBookGetBookPressure/64/5                    55.7 ns         55.7 ns     12595710
+BM_OrderBookGetBookPressure/500/5                   42.4 ns         42.4 ns     16514525
+BM_OrderBookGetBookPressure/10/8                    87.3 ns         87.3 ns      8027475
+BM_OrderBookGetBookPressure/64/8                    87.3 ns         87.3 ns      8019642
+BM_OrderBookGetBookPressure/500/8                   69.4 ns         69.4 ns     10095437
+BM_OrderBookGetBookPressure/10/64                    109 ns          109 ns      6448947
+BM_OrderBookGetBookPressure/64/64                    678 ns          678 ns      1034327
+BM_OrderBookGetBookPressure/500/64                   646 ns          646 ns      1084996
+BM_OrderBookGetBookPressure/10/100                   108 ns          108 ns      6458439
+BM_OrderBookGetBookPressure/64/100                   677 ns          677 ns      1034244
+BM_OrderBookGetBookPressure/500/100                 1025 ns         1025 ns       681643
+BM_RingBuffer_getMedianPrice/100                    10.4 ns         10.4 ns     67388123 items_per_second=96.3108M/s
+BM_RingBuffer_getMedianPrice/512                    10.4 ns         10.4 ns     67307927 items_per_second=96.0671M/s
+BM_RingBuffer_getMedianPrice/4096                   10.4 ns         10.4 ns     67321090 items_per_second=96.2739M/s
+BM_RingBuffer_getMedianPrice/32768                  10.4 ns         10.4 ns     67309748 items_per_second=95.9011M/s
+BM_RingBuffer_getMedianPrice/65536                  10.4 ns         10.4 ns     67258040 items_per_second=96.1109M/s
+BM_Naive_getMedianPrice/100                          386 ns          386 ns      1814191 items_per_second=2.59239M/s
+BM_Naive_getMedianPrice/512                         1485 ns         1485 ns       471554 items_per_second=673.354k/s
+BM_Naive_getMedianPrice/4096                       13824 ns        13822 ns        50687 items_per_second=72.3465k/s
+BM_Naive_getMedianPrice/32768                     107065 ns       107052 ns         6665 items_per_second=9.34125k/s
+BM_Naive_getMedianPrice/65536                     185951 ns       185932 ns         3757 items_per_second=5.37831k/s
+BM_RingBuffer_getMedianPrice_AfterEvict/1000        2.60 ns         2.60 ns    265762894 items_per_second=385.028M/s
+BM_RingBuffer_getMedianPrice_AfterEvict/4096        2.59 ns         2.59 ns    265601166 items_per_second=386.641M/s
+BM_RingBuffer_getMedianPrice_AfterEvict/32768       2.58 ns         2.58 ns    265928078 items_per_second=388.069M/s
+BM_RingBuffer_getMedianPrice_AfterEvict/65536       2.58 ns         2.58 ns    263833435 items_per_second=388.122M/s
+BM_RingBuffer_RecordThenMedian/100                  4653 ns         4622 ns       150891 items_per_second=21.6339M/s
+BM_RingBuffer_RecordThenMedian/512                 21398 ns        21410 ns        32664 items_per_second=23.9137M/s
+BM_RingBuffer_RecordThenMedian/4096               232050 ns       232133 ns         3017 items_per_second=17.645M/s
+BM_RingBuffer_RecordThenMedian/10000              637863 ns       638140 ns         1096 items_per_second=15.6705M/s
+BM_AddOrder/1000                                  370068 ns       369929 ns         1898 items_per_second=2.70322M/s
+BM_AddOrder/4096                                  531821 ns       531539 ns         1314 items_per_second=7.70592M/s
+BM_AddOrder/10000                                 837043 ns       836634 ns          836 items_per_second=11.9527M/s
+BM_GetImbalance                                     4.52 ns         4.51 ns    154966103
+BM_ProcessTrade                                     28.8 ns         28.8 ns     24292808 items_per_second=34.699M/s
+BM_GetVWAP                                          12.0 ns         12.0 ns     58515947
+BM_MemoryPool_Sequential                             568 us          569 us         1231 items_per_second=230.547M/s
+BM_MemoryPool_Random                                 504 us          504 us         1385 items_per_second=194.922M/s
+BM_MemoryPool_NearlyFull                             585 us          586 us         1197 items_per_second=111.854M/s
+BM_OrderBookWorkload/ops:20000/trade_pct:10      2012108 ns      2011605 ns          348 items_per_second=9.94231M/s
+BM_OrderBookWorkload/ops:50000/trade_pct:10      5066491 ns      5065546 ns          138 items_per_second=9.8706M/s
+BM_OrderBookWorkload/ops:100000/trade_pct:10    10200800 ns     10199642 ns           69 items_per_second=9.80427M/s
+BM_OrderBookAddOnly/ops:50000                    8797520 ns      8795479 ns           80 items_per_second=5.68474M/s
+BM_OrderBookDeleteOnly/ops:50000                 5609440 ns      5608683 ns          126 items_per_second=8.91475M/s
+BM_OrderBookTradeOnly/ops:50000                 10589345 ns     10587746 ns           66 items_per_second=4.72244M/s
+BM_AddOrder/10                                       504 ns          504 ns      1000000
+BM_AddOrder/64                                       504 ns          504 ns      1000000
+BM_AddOrder/500                                      521 ns          521 ns      1000000

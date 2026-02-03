@@ -1,0 +1,52 @@
+[0;34m[INFO][0m Build configuration:
+[0;34m[INFO][0m   Build type: Release
+[0;34m[INFO][0m   Log level: 2 (0=OFF, 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG)
+[0;34m[INFO][0m   Latency profiling: false
+[0;34m[INFO][0m   Build demo_reader: false
+[0;34m[INFO][0m   Clean build: false
+[0;34m[INFO][0m   Verbose: false
+
+[0;34m[INFO][0m Building main project (bootcamp)...
+[0;34m[INFO][0m Configuring with CMake (Release)...
+-- Failed to find LLVM FileCheck
+-- git version: v1.8.0 normalized to 1.8.0
+-- Version: 1.8.0
+-- Performing Test HAVE_STD_REGEX -- success
+-- Performing Test HAVE_GNU_POSIX_REGEX -- failed to compile
+-- Performing Test HAVE_POSIX_REGEX -- success
+-- Performing Test HAVE_STEADY_CLOCK -- success
+-- Performing Test HAVE_PTHREAD_AFFINITY -- success
+-- Log level set to: 2 (0=OFF, 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG)
+-- Configuring done (1.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zxguo/dev/bootcamp/build
+[0;34m[INFO][0m Building...
+[  3%] Built target gtest
+[ 10%] Built target impl_lib
+[ 41%] Built target benchmark
+[ 47%] Built target gmock
+[ 47%] Built target gtest_main
+[ 50%] Built target bootcamp
+[ 53%] Built target benchmark_main
+[ 56%] Built target gmock_main
+[ 61%] Built target tests
+[ 64%] Built target bench_compare
+[ 67%] Built target bench_loop_optimization
+[ 70%] Built target bench_prefetch
+[ 73%] Built target bench_loop_comparison
+[ 76%] Built target bench_prefetch_compare
+[100%] Built target benchmarks
+[0;32m[SUCCESS][0m Main project built successfully: build/bootcamp
+[0;32m[SUCCESS][0m Main project build completed
+
+========================================
+[0;32m[SUCCESS][0m Build completed successfully!
+[0;34m[INFO][0m Build time: 2s
+========================================
+
+[0;34m[INFO][0m Build artifacts:
+  - Main executable: build/bootcamp
+
+[0;34m[INFO][0m Usage hints:
+  Run main program: ./build/bootcamp <input_file> <output_file> <grid_file>
+

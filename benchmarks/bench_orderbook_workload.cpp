@@ -10,7 +10,7 @@ using namespace impl;
 
 namespace {
 
-constexpr uint64_t kMaxOrderId = MAX_ORDERS - 1;
+constexpr uint64_t kMaxOrderId = (1u << 16) - 1;
 constexpr int32_t kBasePrice = 100000;  // cents
 constexpr int32_t kMaxQty = 1000;
 
